@@ -1,0 +1,5 @@
+*.stl
+*.mp3
+*.wav
+record_project/outputs/
+record_project/uploads/

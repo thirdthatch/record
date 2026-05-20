@@ -20,6 +20,7 @@ import shutil
 import subprocess
 import sys
 import time
+import threading
 import warnings
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -51,6 +52,8 @@ UPLOAD_DIR = ROOT / "uploads"
 OUTPUT_DIR = ROOT / "outputs"
 HOST = "127.0.0.1"
 PORT = 8765
+CLEANUP_INTERVAL_SECONDS = 60
+FILE_LIFETIME_SECONDS = 10 * 60
 
 
 def _safe_name(name: str) -> str:
@@ -488,10 +491,36 @@ class GUIHandler(SimpleHTTPRequestHandler):
         self.wfile.write(data)
 
 
+def cleanup_expired_outputs() -> None:
+    now = time.time()
+    for directory in (UPLOAD_DIR, OUTPUT_DIR):
+        if not directory.exists():
+            continue
+        for path in directory.iterdir():
+            try:
+                if path.is_dir():
+                    shutil.rmtree(path)
+                    continue
+                mtime = path.stat().st_mtime
+                if now - mtime > FILE_LIFETIME_SECONDS:
+                    path.unlink()
+            except Exception:
+                continue
+
+
+def cleanup_loop() -> None:
+    while True:
+        time.sleep(CLEANUP_INTERVAL_SECONDS)
+        cleanup_expired_outputs()
+
+
 def main() -> None:
     os.chdir(ROOT)
     UPLOAD_DIR.mkdir(exist_ok=True)
     OUTPUT_DIR.mkdir(exist_ok=True)
+    cleanup_expired_outputs()
+    cleanup_thread = threading.Thread(target=cleanup_loop, daemon=True)
+    cleanup_thread.start()
     httpd = ThreadingHTTPServer((HOST, PORT), GUIHandler)
     print(f"Record GUI server: http://{HOST}:{PORT}/")
     httpd.serve_forever()
