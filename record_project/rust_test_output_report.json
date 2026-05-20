@@ -1,0 +1,33 @@
+{
+  "audio": {
+    "actual_duration_s": 1.0,
+    "max_duration_s": 172.72727272727272,
+    "multi_files_mode": "none",
+    "side_durations_s": [
+      1.0
+    ],
+    "silence_between_a_s": 0.0,
+    "silence_between_b_s": 0.0,
+    "silence_between_s": 0.0
+  },
+  "groove": {
+    "spacing_factor": 1.0,
+    "total_points": 198
+  },
+  "record": {
+    "groove_mode": "mono",
+    "rpm": 33,
+    "sides": 1,
+    "size_inch": 7,
+    "split_mode": "duplicate"
+  },
+  "stl_output": {
+    "files": [
+      "rust_test_output_sideA.stl"
+    ],
+    "total_triangles": 3668,
+    "triangle_counts": [
+      3668
+    ]
+  }
+}

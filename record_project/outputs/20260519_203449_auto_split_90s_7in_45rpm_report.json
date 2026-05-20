@@ -1,0 +1,47 @@
+{
+  "generated_at": "2026-05-19T20:34:52.967329",
+  "record": {
+    "size_inch": 7,
+    "diameter_mm": 174.0,
+    "thickness_mm": 1.8,
+    "rpm": 45,
+    "groove_mode": "mono",
+    "sides": 2,
+    "split_mode": "auto"
+  },
+  "groove": {
+    "width_mm": 0.55,
+    "depth_mm": 0.28,
+    "spacing_mm": 0.28,
+    "turns": 57.23,
+    "total_length_m": 42.251,
+    "total_points": 24299
+  },
+  "audio": {
+    "max_duration_s": 152.61,
+    "actual_duration_s": 90.0,
+    "side_durations_s": [
+      76.31,
+      13.69
+    ]
+  },
+  "stl_output": {
+    "files": [
+      "/Users/mitomayugo/Desktop/Record/record_project/outputs/20260519_203449_auto_split_90s_7in_45rpm_sideA.stl",
+      "/Users/mitomayugo/Desktop/Record/record_project/outputs/20260519_203449_auto_split_90s_7in_45rpm_sideB.stl"
+    ],
+    "triangle_counts": [
+      85284,
+      17664
+    ],
+    "total_triangles": 102948
+  },
+  "print_settings": {
+    "layer_height_mm": 0.05,
+    "nozzle_mm": 0.25,
+    "speed_mm_s": 20,
+    "infill_percent": 100,
+    "material": "Resin (SLA/DLP) or PLA fine",
+    "recommended_printer": "SLA/DLP"
+  }
+}

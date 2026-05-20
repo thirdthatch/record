@@ -1,0 +1,40 @@
+{
+  "generated_at": "2026-05-19T20:25:14.818980",
+  "record": {
+    "size_inch": 12,
+    "diameter_mm": 304.8,
+    "thickness_mm": 2.0,
+    "rpm": 33,
+    "groove_mode": "mono",
+    "sides": 1
+  },
+  "groove": {
+    "width_mm": 0.55,
+    "depth_mm": 0.28,
+    "spacing_mm": 0.3,
+    "turns": 101.18,
+    "total_length_m": 65.478,
+    "total_points": 36423
+  },
+  "audio": {
+    "max_duration_s": 183.96,
+    "actual_duration_s": 183.96
+  },
+  "stl_output": {
+    "files": [
+      "/Users/mitomayugo/Desktop/Record/record_project/outputs/20260519_202509_20260519_202241_Elektronomia-Limitless_12in_33rpm_sideA.stl"
+    ],
+    "triangle_counts": [
+      148568
+    ],
+    "total_triangles": 148568
+  },
+  "print_settings": {
+    "layer_height_mm": 0.05,
+    "nozzle_mm": 0.25,
+    "speed_mm_s": 20,
+    "infill_percent": 100,
+    "material": "Resin (SLA/DLP) or PLA fine",
+    "recommended_printer": "SLA/DLP"
+  }
+}

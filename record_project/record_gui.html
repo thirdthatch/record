@@ -1,0 +1,1817 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D Vinyl Record Generator</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Bebas+Neue&family=DM+Sans:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #0a0a0c;
+    --panel: #111116;
+    --border: #222230;
+    --groove: #1a1a28;
+    --accent: #e8c840;
+    --accent2: #ff6b35;
+    --text: #d8d8e8;
+    --muted: #67677a;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  button, input, select { font: inherit; }
+  button { cursor: pointer; }
+
+  .container {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    grid-template-rows: auto 1fr;
+    min-height: 100vh;
+  }
+
+  header {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 18px 32px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+  }
+
+  .logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    letter-spacing: 3px;
+    color: var(--accent);
+  }
+
+  .logo span { color: var(--text); opacity: .5; }
+
+  .server-state {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #777;
+  }
+
+  .dot.ready { background: #41c46a; }
+  .dot.error { background: #e74c3c; }
+
+  .sidebar {
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .section-title {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .card {
+    background: var(--groove);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+
+  .drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    padding: 24px 16px;
+    text-align: center;
+    position: relative;
+    transition: border-color .2s, background .2s;
+  }
+
+  .drop-zone:hover,
+  .drop-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(232, 200, 64, .04);
+  }
+
+  .drop-zone input[type=file] {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .drop-icon { font-size: 28px; margin-bottom: 6px; }
+  .drop-text { font-size: 13px; color: var(--muted); }
+  .drop-text strong { color: var(--text); }
+
+  .file-name {
+    margin-top: 8px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--accent2);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .seg-group {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+
+  .seg-btn {
+    flex: 1;
+    min-width: 0;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    padding: 7px 10px;
+    border-radius: 6px;
+    transition: all .15s;
+  }
+
+  .seg-btn:hover { border-color: var(--accent); color: var(--text); }
+  .seg-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #000;
+    font-weight: 500;
+  }
+
+  .option-row {
+    display: grid;
+    grid-template-columns: 1fr 120px;
+    align-items: center;
+    gap: 12px;
+    margin-top: 12px;
+  }
+
+  .option-row label {
+    color: var(--text);
+    font-size: 13px;
+  }
+
+  .select {
+    width: 100%;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 7px 10px;
+  }
+
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 10px;
+  }
+
+  .toggle-label { font-size: 13px; color: var(--text); }
+
+  .toggle {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    display: block;
+  }
+
+  .toggle input { display: none; }
+
+  .toggle-track {
+    position: absolute;
+    inset: 0;
+    background: var(--border);
+    border-radius: 12px;
+    transition: background .2s;
+  }
+
+  .toggle-thumb {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 18px;
+    height: 18px;
+    background: #fff;
+    border-radius: 50%;
+    transition: left .2s;
+  }
+
+  .toggle input:checked + .toggle-track { background: var(--accent); }
+  .toggle input:checked ~ .toggle-thumb { left: 23px; }
+
+  .gen-btn {
+    width: 100%;
+    padding: 14px;
+    background: var(--accent);
+    border: none;
+    border-radius: 8px;
+    color: #000;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 18px;
+    letter-spacing: 2px;
+    transition: all .2s;
+  }
+
+  .gen-btn:hover:not(:disabled) { background: #f0d44a; transform: translateY(-1px); }
+  .gen-btn:disabled {
+    background: var(--border);
+    color: var(--muted);
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .upload-card {
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .waveform-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    margin-top: 14px;
+    padding: 12px 0 6px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .wave-control-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1 1 240px;
+    min-width: 0;
+  }
+
+  .wave-control-row label,
+  .wave-control-label {
+    font-size: 11px;
+    color: var(--muted);
+    min-width: 44px;
+  }
+
+  .wave-control-row input[type=range] {
+    flex: 1;
+  }
+
+  .wave-channel-group {
+    display: flex;
+    gap: 6px;
+  }
+
+  .channel-btn {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    padding: 6px 10px;
+    border-radius: 8px;
+  }
+
+  .channel-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #000;
+  }
+
+  .upload-dropzone {
+    border: 2px dashed var(--border);
+    border-radius: 14px;
+    padding: 24px;
+    text-align: center;
+    background: rgba(232,200,64,.04);
+    transition: border-color .2s, background .2s;
+    display: grid;
+    gap: 12px;
+    align-items: center;
+    justify-items: center;
+    cursor: pointer;
+  }
+
+  .upload-dropzone:hover,
+  .upload-dropzone.drag-over {
+    border-color: var(--accent);
+    background: rgba(232,200,64,.12);
+  }
+
+  .upload-dropzone .drop-icon {
+    font-size: 32px;
+    color: var(--accent);
+  }
+
+  .upload-dropzone .drop-text {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .upload-status {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  .audio-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+
+  .audio-controls .play-btn {
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--text);
+    min-width: 86px;
+  }
+
+  .audio-controls .play-btn:disabled {
+    opacity: .45;
+    cursor: not-allowed;
+  }
+
+  .audio-status {
+    font-family: 'DM Mono', monospace;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .waveform-hint {
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .main {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    background: var(--bg);
+  }
+
+  .preview-area {
+    flex: 1;
+    min-height: 360px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    overflow: hidden;
+  }
+
+  canvas#vinylCanvas {
+    width: min(420px, calc(100% - 32px));
+    height: min(420px, calc(100% - 32px));
+    max-width: 420px;
+    max-height: 420px;
+    border-radius: 50%;
+    box-shadow: 0 0 80px rgba(0,0,0,.8), 0 0 20px rgba(232,200,64,.06);
+  }
+
+  .waveform-area {
+    min-height: 150px;
+    border-top: 1px solid var(--border);
+    padding: 16px 24px 24px;
+    background: var(--panel);
+    position: relative;
+  }
+
+  .waveform-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    position: absolute;
+    top: 12px;
+    left: 24px;
+  }
+
+  canvas#waveCanvas {
+    width: 100%;
+    height: 70px;
+    margin-top: 24px;
+    display: block;
+    cursor: pointer;
+  }
+
+  .info-bar {
+    border-top: 1px solid var(--border);
+    padding: 10px 24px;
+    background: var(--panel);
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .info-key {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+
+  .info-val {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: var(--accent);
+  }
+
+  .output-panel {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.8);
+    backdrop-filter: blur(6px);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .output-panel.show { display: flex; }
+
+  .output-box {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    max-width: 620px;
+    width: 100%;
+    max-height: 82vh;
+    overflow-y: auto;
+  }
+
+  .output-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 24px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    margin-bottom: 16px;
+  }
+
+  .output-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+
+  .output-card {
+    background: var(--groove);
+    border-radius: 8px;
+    padding: 12px;
+  }
+
+  .output-card .key {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .output-card .val {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: var(--text);
+    word-break: break-word;
+  }
+
+  .download-btns {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+
+  .dl-btn,
+  .close-btn {
+    padding: 11px 12px;
+    border-radius: 8px;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    text-align: center;
+    text-decoration: none;
+  }
+
+  .dl-btn { background: var(--accent); color: #000; border: none; }
+  .close-btn {
+    width: 100%;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .log {
+    background: var(--groove);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 16px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    line-height: 1.6;
+    color: var(--muted);
+    white-space: pre-wrap;
+    max-height: 180px;
+    overflow: auto;
+  }
+
+  .progress {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: rgba(0,0,0,.7);
+    align-items: center;
+    justify-content: center;
+  }
+
+  .progress.show { display: flex; }
+
+  .progress-box {
+    min-width: 300px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px 36px;
+    text-align: center;
+  }
+
+  .progress-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 20px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    margin-bottom: 16px;
+  }
+
+  .progress-bar-wrap {
+    background: var(--groove);
+    border-radius: 4px;
+    height: 6px;
+    overflow: hidden;
+    margin-bottom: 12px;
+  }
+
+  .progress-bar {
+    width: 0%;
+    height: 100%;
+    background: var(--accent);
+    border-radius: 4px;
+    transition: width .2s;
+  }
+
+  .progress-msg {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .error-text {
+    color: #ff7979;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  @media (max-width: 760px) {
+    .container {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto auto 1fr;
+    }
+
+    .sidebar {
+      border-right: none;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .output-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="logo">Record Generator</div>
+    <div class="server-state">
+      <span class="dot" id="serverDot"></span>
+      <span id="serverText">server check...</span>
+    </div>
+  </header>
+
+  <aside class="sidebar">
+    <div class="card" id="multiFileCard">
+      <div class="section-title">音声ファイル設定</div>
+      <div id="multiFileContainer" style="display: block;">
+        <div style="font-size: 12px; color: var(--muted); margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border);">
+          複数の音声ファイルを組み合わせてレコードを作成します。
+        </div>
+
+        <!-- Track split mode selector -->
+        <div style="margin-bottom: 12px;">
+          <div style="font-size: 11px; color: var(--muted); margin-bottom: 6px;">トラック分割モード</div>
+          <div class="seg-group">
+            <button class="seg-btn active" type="button" id="trackSplitModeAuto" data-mode="auto" style="flex: 1;">自動分割</button>
+            <button class="seg-btn" type="button" id="trackSplitModeSeparate" data-mode="separate" style="flex: 1;">個別指定</button>
+          </div>
+          <div style="font-size: 10px; color: var(--muted); margin-top: 6px;">
+            <span id="trackSplitModeDesc">ファイルを順序通りに選択します</span>
+          </div>
+        </div>
+
+        <!-- Auto-split mode: single file list -->
+        <div id="autoSplitModeUI">
+          <div class="drop-zone" id="multiDropZoneAuto" style="margin-bottom: 12px; padding: 16px;">
+            <input type="file" id="multiFileInputAuto" accept=".wav,.mp3,audio/wav,audio/mpeg" multiple>
+            <div class="drop-icon">♪</div>
+            <div class="drop-text">
+              <strong>ファイルをドロップ / クリック</strong><br>
+              <span>複数選択可能</span>
+            </div>
+          </div>
+          <div id="multiFilesListAuto" style="display: none;">
+            <div style="font-size: 11px; color: var(--muted); margin-bottom: 8px;">選択されたファイル (順序が重要):</div>
+            <div id="filesListContentAuto" style="display: flex; flex-direction: column; gap: 6px;"></div>
+          </div>
+          <div class="option-row" style="margin-top: 10px;">
+            <label for="silenceBetweenSelectAuto">ファイル間の沈黙</label>
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <input type="number" id="silenceBetweenSelectAuto" min="0" max="10" step="0.1" value="0" style="width: 60px; padding: 6px; background: var(--panel); border: 1px solid var(--border); border-radius: 4px; color: var(--text);">
+              <span style="font-size: 11px; color: var(--muted);">秒</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Separate mode: A-side and B-side file lists -->
+        <div id="separateModeUI" style="display: none;">
+          <div style="font-size: 11px; color: var(--accent); margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--groove);">
+            A面とB面で異なるファイルを指定します
+          </div>
+
+          <!-- A-side files -->
+          <div style="margin-bottom: 16px;">
+            <div style="font-size: 11px; color: var(--accent); margin-bottom: 8px;">A面用ファイル</div>
+            <div class="drop-zone" id="multiDropZoneA" style="margin-bottom: 12px; padding: 16px;">
+              <input type="file" id="multiFileInputA" accept=".wav,.mp3,audio/wav,audio/mpeg" multiple>
+              <div class="drop-icon">A</div>
+              <div class="drop-text">
+                <strong>A面用ファイルを選択してください</strong><br>
+                <span>複数選択可能</span>
+              </div>
+            </div>
+            <div id="multiFilesListA" style="display: none;">
+              <div style="font-size: 10px; color: var(--muted); margin-bottom: 6px;">選択されたファイル:</div>
+              <div id="filesListContentA" style="display: flex; flex-direction: column; gap: 4px;"></div>
+            </div>
+            <div class="option-row" style="margin-top: 8px;">
+              <label for="silenceBetweenSelectA" style="font-size: 12px;">A面内の沈黙</label>
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <input type="number" id="silenceBetweenSelectA" min="0" max="10" step="0.1" value="0" style="width: 50px; padding: 6px; background: var(--panel); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 11px;">
+                <span style="font-size: 10px; color: var(--muted);">秒</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- B-side files -->
+          <div>
+            <div style="font-size: 11px; color: var(--accent2); margin-bottom: 8px;">B面用ファイル</div>
+            <div class="drop-zone" id="multiDropZoneB" style="margin-bottom: 12px; padding: 16px;">
+              <input type="file" id="multiFileInputB" accept=".wav,.mp3,audio/wav,audio/mpeg" multiple>
+              <div class="drop-icon">B</div>
+              <div class="drop-text">
+                <strong>B面用ファイルを選択してください</strong><br>
+                <span>複数選択可能</span>
+              </div>
+            </div>
+            <div id="multiFilesListB" style="display: none;">
+              <div style="font-size: 10px; color: var(--muted); margin-bottom: 6px;">選択されたファイル:</div>
+              <div id="filesListContentB" style="display: flex; flex-direction: column; gap: 4px;"></div>
+            </div>
+            <div class="option-row" style="margin-top: 8px;">
+              <label for="silenceBetweenSelectB" style="font-size: 12px;">B面内の沈黙</label>
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <input type="number" id="silenceBetweenSelectB" min="0" max="10" step="0.1" value="0" style="width: 50px; padding: 6px; background: var(--panel); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 11px;">
+                <span style="font-size: 10px; color: var(--muted);">秒</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">レコードサイズ</div>
+      <div class="seg-group" id="sizeGroup">
+        <button class="seg-btn" type="button" data-type="size" data-val="7">7"</button>
+        <button class="seg-btn" type="button" data-type="size" data-val="10">10"</button>
+        <button class="seg-btn active" type="button" data-type="size" data-val="12">12"</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">回転数 (RPM)</div>
+      <div class="seg-group" id="rpmGroup">
+        <button class="seg-btn active" type="button" data-type="rpm" data-val="33">33 RPM</button>
+        <button class="seg-btn" type="button" data-type="rpm" data-val="45">45 RPM</button>
+        <button class="seg-btn" type="button" data-type="rpm" data-val="78">78 RPM</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">溝方式</div>
+      <div class="seg-group" id="grooveGroup">
+        <button class="seg-btn active" type="button" data-type="groove" data-val="mono">MONO</button>
+        <button class="seg-btn" type="button" data-type="groove" data-val="stereo">STEREO</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">出力設定</div>
+      <div class="option-row">
+        <label for="grooveSpacingSlider">溝ピッチ調整</label>
+        <div style="grid-column: 1 / -1; margin-top: 4px;">
+          <input type="range" id="grooveSpacingSlider" min="0.5" max="2.0" step="0.1" value="1.0" style="width: 100%;">
+          <div style="font-size: 11px; color: var(--muted); margin-top: 4px;">
+            倍率: <span id="grooveSpacingValue">1.0×</span> <span id="grooveSpacingWarning" style="color: #ff9800;"></span>
+          </div>
+        </div>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">RIAA EQ</span>
+        <label class="toggle">
+          <input type="checkbox" id="riaaToggle" checked>
+          <span class="toggle-track"></span>
+          <span class="toggle-thumb"></span>
+        </label>
+      </div>
+      <div class="option-row">
+        <label for="qualitySelect">品質</label>
+        <select class="select" id="qualitySelect">
+          <option value="preview">preview</option>
+          <option value="draft">draft</option>
+          <option value="high" selected>high</option>
+          <option value="full">full</option>
+          <option value="max">max</option>
+        </select>
+      </div>
+      <div class="option-row">
+        <label for="modeSelect">STL出力</label>
+        <select class="select" id="modeSelect">
+          <option value="single" selected>single</option>
+          <option value="streaming">streaming</option>
+        </select>
+      </div>
+      <div class="option-row">
+        <label for="outputFormatSelect">出力形式</label>
+        <select class="select" id="outputFormatSelect">
+          <option value="stl" selected>STL</option>
+          <option value="3mf">3MF</option>
+          <option value="both">STL + 3MF</option>
+        </select>
+      </div>
+    </div>
+
+    <button class="gen-btn" id="genBtn" type="button" disabled>STLを生成</button>
+
+    <div class="card upload-card">
+      <div class="section-title">STL検証 / 再生</div>
+      <div class="upload-dropzone" id="stlDropZone">
+        <div class="drop-icon">⤓</div>
+        <div class="drop-text">STLファイルをここにドロップ、またはファイルを選択</div>
+        <input type="file" id="stlFileInput" accept=".stl,.3mf" style="display:none">
+      </div>
+      <div class="upload-status" id="stlUploadStatus">STLをアップロードして、WAV再生とwaveformを表示します。</div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">Downloads</div>
+      <button class="gen-btn" id="openDownloads" type="button">Processed filesを表示</button>
+    </div>
+
+    <div class="error-text" id="formError"></div>
+  </aside>
+
+  <main class="main">
+    <div class="preview-area">
+      <canvas id="vinylCanvas" width="420" height="420"></canvas>
+    </div>
+
+    <div class="waveform-area">
+      <div class="audio-controls">
+        <button class="play-btn" id="audioPlayBtn" type="button" disabled>▶ Play</button>
+        <button class="play-btn" id="audioPauseBtn" type="button" disabled>⏸ Pause</button>
+        <span class="audio-status" id="audioStatus">No audio loaded</span>
+      </div>
+      <div class="waveform-label">WAVEFORM</div>
+      <div class="waveform-controls">
+        <div class="wave-control-row">
+          <label for="waveZoomSlider">Zoom</label>
+          <input type="range" id="waveZoomSlider" min="1" max="5" step="0.5" value="1">
+          <span id="waveZoomValue">1.0×</span>
+        </div>
+        <div class="wave-control-row">
+          <span class="wave-control-label">Channel</span>
+          <div class="wave-channel-group" id="waveChannelGroup">
+            <button class="channel-btn active" type="button" data-channel="auto">Auto</button>
+            <button class="channel-btn" type="button" data-channel="left">L</button>
+            <button class="channel-btn" type="button" data-channel="right">R</button>
+          </div>
+        </div>
+      </div>
+      <canvas id="waveCanvas" width="800" height="70"></canvas>
+      <div class="waveform-hint">Waveform上をクリックすると再生位置を変更できます。</div>
+    </div>
+
+    <div class="info-bar">
+      <div class="info-item">
+        <div class="info-key">最大収録時間</div>
+        <div class="info-val" id="infoMaxDur">-</div>
+      </div>
+      <div class="info-item">
+        <div class="info-key">音声時間</div>
+        <div class="info-val" id="infoAudioDur">-</div>
+      </div>
+      <div class="info-item">
+        <div class="info-key">ステレオ</div>
+        <div class="info-val" id="infoStereo">Mono</div>
+      </div>
+      <div class="info-item">
+        <div class="info-key">溝の巻き数</div>
+        <div class="info-val" id="infoTurns">-</div>
+      </div>
+      <div class="info-item">
+        <div class="info-key">溝の総延長</div>
+        <div class="info-val" id="infoGrooveLen">-</div>
+      </div>
+      <div class="info-item">
+        <div class="info-key">推奨プリンター</div>
+        <div class="info-val" id="infoPrinter">SLA / DLP</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="progress" id="progress">
+  <div class="progress-box">
+    <div class="progress-title">生成中</div>
+    <div class="progress-bar-wrap"><div class="progress-bar" id="progressBar"></div></div>
+    <div class="progress-msg" id="progressMsg">アップロード準備中...</div>
+  </div>
+</div>
+
+<div class="output-panel" id="outputPanel">
+  <div class="output-box">
+    <div class="output-title">出力完了</div>
+    <div class="output-grid" id="outputGrid"></div>
+    <div class="download-btns" id="downloadBtns"></div>
+    <div class="section-title">Log</div>
+    <div class="log" id="Log"></div>
+    <button class="close-btn" type="button" id="closeOutput">閉じる</button>
+  </div>
+</div>
+
+<script>
+const SPECS = {
+  7:  { outer_r: 87.0,  groove_outer: 82.5, groove_inner: 35.0, label_r: 33.5, thickness: 1.8, hole_r: 3.75 },
+  10: { outer_r: 127.0, groove_outer: 122.5, groove_inner: 38.0, label_r: 36.0, thickness: 1.8, hole_r: 3.75 },
+  12: { outer_r: 152.4, groove_outer: 146.0, groove_inner: 60.0, label_r: 58.0, thickness: 2.0, hole_r: 3.75 },
+};
+
+const RPM_G = {
+  33: { w: 0.30, d: 0.20, sp: 0.20 },
+  45: { w: 0.55, d: 0.28, sp: 0.28 },
+  78: { w: 0.65, d: 0.35, sp: 0.25 },
+};
+
+const state = {
+  size: 12,
+  rpm: 33,
+  groove: 'mono',
+  audioDuration: null,
+  audioSamples: null,
+  audioSampleRate: 44100,
+  currentAudioUrl: null,
+  waveformLeft: null,
+  waveformRight: null,
+  waveformChannels: 1,
+  waveformSampleRate: 44100,
+  waveformZoom: 1,
+  waveformChannel: 'auto',
+  isSeeking: false,
+  grooveSpacingFactor: 1.0,
+  multiFilesMode: 'auto',
+  multiFiles: [],
+  filesA: [],
+  filesB: [],
+};
+
+const API_BASE_URL = window.location.protocol === 'file:' ? 'http://127.0.0.1:8765' : window.location.origin;
+
+const els = {
+  genBtn: document.getElementById('genBtn'),
+  openDownloads: document.getElementById('openDownloads'),
+  stlFileInput: document.getElementById('stlFileInput'),
+  stlDropZone: document.getElementById('stlDropZone'),
+  stlUploadStatus: document.getElementById('stlUploadStatus'),
+  audioPlayBtn: document.getElementById('audioPlayBtn'),
+  audioPauseBtn: document.getElementById('audioPauseBtn'),
+  audioStatus: document.getElementById('audioStatus'),
+  formError: document.getElementById('formError'),
+  riaaToggle: document.getElementById('riaaToggle'),
+  qualitySelect: document.getElementById('qualitySelect'),
+  modeSelect: document.getElementById('modeSelect'),
+  outputFormatSelect: document.getElementById('outputFormatSelect'),
+  progress: document.getElementById('progress'),
+  progressBar: document.getElementById('progressBar'),
+  progressMsg: document.getElementById('progressMsg'),
+  grooveSpacingSlider: document.getElementById('grooveSpacingSlider'),
+  grooveSpacingValue: document.getElementById('grooveSpacingValue'),
+  grooveSpacingWarning: document.getElementById('grooveSpacingWarning'),
+  waveZoomSlider: document.getElementById('waveZoomSlider'),
+  waveZoomValue: document.getElementById('waveZoomValue'),
+  waveChannelGroup: document.getElementById('waveChannelGroup'),
+  infoStereo: document.getElementById('infoStereo'),
+  multiFileCard: document.getElementById('multiFileCard'),
+  multiFileContainer: document.getElementById('multiFileContainer'),
+  trackSplitModeAuto: document.getElementById('trackSplitModeAuto'),
+  trackSplitModeSeparate: document.getElementById('trackSplitModeSeparate'),
+  trackSplitModeDesc: document.getElementById('trackSplitModeDesc'),
+  // Auto-split mode
+  autoSplitModeUI: document.getElementById('autoSplitModeUI'),
+  multiFileInputAuto: document.getElementById('multiFileInputAuto'),
+  multiDropZoneAuto: document.getElementById('multiDropZoneAuto'),
+  multiFilesListAuto: document.getElementById('multiFilesListAuto'),
+  filesListContentAuto: document.getElementById('filesListContentAuto'),
+  silenceBetweenSelectAuto: document.getElementById('silenceBetweenSelectAuto'),
+  // Separate mode
+  separateModeUI: document.getElementById('separateModeUI'),
+  multiFileInputA: document.getElementById('multiFileInputA'),
+  multiDropZoneA: document.getElementById('multiDropZoneA'),
+  multiFilesListA: document.getElementById('multiFilesListA'),
+  filesListContentA: document.getElementById('filesListContentA'),
+  silenceBetweenSelectA: document.getElementById('silenceBetweenSelectA'),
+  multiFileInputB: document.getElementById('multiFileInputB'),
+  multiDropZoneB: document.getElementById('multiDropZoneB'),
+  multiFilesListB: document.getElementById('multiFilesListB'),
+  filesListContentB: document.getElementById('filesListContentB'),
+  silenceBetweenSelectB: document.getElementById('silenceBetweenSelectB'),
+};
+
+const audioPlayer = new Audio();
+
+function fmtSec(s) {
+  if (!Number.isFinite(s)) return '-';
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return `${m}:${String(sec).padStart(2, '0')}`;
+}
+
+function calcMaxDuration(size, rpm, grooveSpacingFactor = 1.0) {
+  const spec = SPECS[size];
+  const g = RPM_G[rpm];
+  // groove_spacing を grooveSpacingFactor で調整
+  const adjustedSpacing = g.sp * grooveSpacingFactor;
+  const pitch = g.w + adjustedSpacing;
+  const turns = (spec.groove_outer - spec.groove_inner) / pitch;
+  const rMean = (spec.groove_outer + spec.groove_inner) / 2;
+  const lenMm = 2 * Math.PI * rMean * turns;
+  const v = 2 * Math.PI * rMean * rpm / 60;
+  return { duration: lenMm / v, turns, lenMm };
+}
+
+function updateInfo() {
+  const info = calcMaxDuration(state.size, state.rpm, state.grooveSpacingFactor);
+  const totalSides = state.multiFilesMode === 'separate' && state.filesB.length > 0 ? 2 : 1;
+  document.getElementById('infoMaxDur').textContent = fmtSec(info.duration * totalSides);
+  document.getElementById('infoAudioDur').textContent = state.audioDuration ? fmtSec(state.audioDuration) : '-';
+  els.infoStereo.textContent = state.groove === 'stereo' ? 'Stereo' : 'Mono';
+  document.getElementById('infoTurns').textContent = (info.turns * totalSides).toFixed(1);
+  document.getElementById('infoGrooveLen').textContent = `${((info.lenMm * totalSides) / 1000).toFixed(1)} m`;
+  document.getElementById('infoPrinter').textContent = state.rpm === 78 ? 'SLA / DLP / FDM fine' : 'SLA / DLP';
+  updateGenerateButtonState();
+}
+
+function isGenerateEnabled() {
+  if (state.multiFilesMode === 'auto') return state.multiFiles.length > 0;
+  if (state.multiFilesMode === 'separate') return state.filesA.length > 0;
+  return false;
+}
+
+function updateGenerateButtonState() {
+  els.genBtn.disabled = !isGenerateEnabled();
+}
+
+function setAudioStatus(text) {
+  els.audioStatus.textContent = text;
+}
+
+function setAudioControls(enabled) {
+  els.audioPlayBtn.disabled = !enabled;
+  els.audioPauseBtn.disabled = !enabled;
+}
+
+function getWaveformSamples() {
+  const left = state.waveformLeft || [];
+  const right = state.waveformRight || [];
+  if (!left.length && !right.length) return null;
+  const channel = state.waveformChannel;
+  if (channel === 'left') return left;
+  if (channel === 'right') return right;
+  if (left.length && right.length) {
+    return left.map((value, index) => {
+      const r = right[index] ?? 0;
+      return (value + r) / 2;
+    });
+  }
+  return left.length ? left : right;
+}
+
+function formatWaveformInfo() {
+  const channelText = state.waveformChannel === 'auto' ? (state.waveformChannels === 2 ? 'Stereo' : 'Mono') : state.waveformChannel.toUpperCase();
+  return `${state.waveformZoom.toFixed(1)}× ・ ${channelText}`;
+}
+
+async function setAudioSource(url) {
+  if (!url) return;
+  if (state.currentAudioUrl && state.currentAudioUrl !== url) {
+    URL.revokeObjectURL(state.currentAudioUrl);
+  }
+  state.currentAudioUrl = url;
+  const resolvedUrl = url.startsWith('http') ? url : new URL(url, API_BASE_URL).href;
+  audioPlayer.src = resolvedUrl;
+  audioPlayer.load();
+  setAudioStatus('Loading audio...');
+  setAudioControls(false);
+  audioPlayer.onloadedmetadata = () => {
+    state.audioDuration = audioPlayer.duration || state.audioDuration;
+    updateInfo();
+    setAudioStatus(`Ready: ${fmtSec(state.audioDuration)}`);
+    setAudioControls(true);
+    drawWaveform();
+  };
+  audioPlayer.onended = () => {
+    setAudioStatus('Playback ended');
+    drawWaveform();
+  };
+  audioPlayer.ontimeupdate = () => drawWaveform();
+}
+
+async function uploadStlFile(file) {
+  if (!file) return;
+  els.formError.textContent = '';
+  els.stlUploadStatus.textContent = `アップロード中: ${file.name}`;
+  els.progress.classList.add('show');
+  setProgress(0, 'STLアップロード中...');
+  const data = new FormData();
+  data.append('file', file);
+  try {
+    const result = await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', new URL('/api/reverse_record', API_BASE_URL).href);
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percent = Math.min(95, Math.round((event.loaded / event.total) * 80));
+          setProgress(percent, `アップロード中 ${Math.round((event.loaded / event.total) * 100)}%`);
+        }
+      };
+      xhr.onload = () => {
+        const bodyText = xhr.responseText || '';
+        if (xhr.status < 200 || xhr.status >= 300) {
+          return reject(new Error(bodyText || `HTTP ${xhr.status}`));
+        }
+        try {
+          const parsed = JSON.parse(bodyText);
+          resolve(parsed);
+        } catch (jsonError) {
+          reject(new Error(bodyText || 'STL検証に失敗しました'));
+        }
+      };
+      xhr.onerror = () => reject(new Error('ネットワークエラーが発生しました。'));
+      xhr.send(data);
+    });
+    setProgress(95, 'STL検証中...');
+    if (!result.ok) {
+      throw new Error(result.error || result.trace || 'STL検証に失敗しました');
+    }
+    if (result.wav_url) {
+      await setAudioSource(result.wav_url);
+    }
+    state.waveformLeft = result.waveform?.left || null;
+    state.waveformRight = result.waveform?.right || null;
+    state.waveformChannels = result.waveform?.channels || 1;
+    state.waveformSampleRate = result.waveform?.sample_rate || state.waveformSampleRate;
+    state.audioSamples = null;
+    state.audioDuration = result.info?.duration_s || state.audioDuration;
+    updateInfo();
+    els.stlUploadStatus.textContent = `STL検証完了: ${file.name}`;
+    drawWaveform();
+    setProgress(100, '完了');
+    els.progress.classList.remove('show');
+    return result;
+  } catch (error) {
+    els.stlUploadStatus.textContent = 'STL検証に失敗しました。';
+    els.formError.textContent = error.message;
+    els.progress.classList.remove('show');
+    console.warn(error);
+    throw error;
+  }
+}
+
+async function fetchStlAndVerify(fileUrl, fileName) {
+  try {
+    const resolvedUrl = fileUrl.startsWith('http') ? fileUrl : new URL(fileUrl, API_BASE_URL).href;
+    const res = await fetch(resolvedUrl);
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`Failed to download ${fileName}: ${body || res.statusText}`);
+    }
+    const blob = await res.blob();
+    const stlFile = new File([blob], fileName, { type: 'application/sla' });
+    return uploadStlFile(stlFile);
+  } catch (error) {
+    els.stlUploadStatus.textContent = '生成STLの自動検証に失敗しました。';
+    els.formError.textContent = error.message;
+    console.warn('Auto verify STL failed', error);
+  }
+}
+
+async function openDownloadsPanel() {
+  document.getElementById('outputPanel').classList.add('show');
+}
+
+function seekWaveform(event) {
+  const canvas = document.getElementById('waveCanvas');
+  const rect = canvas.getBoundingClientRect();
+  const x = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
+  const ratio = x / rect.width;
+  if (!audioPlayer.duration || Number.isNaN(ratio)) return;
+  audioPlayer.currentTime = ratio * audioPlayer.duration;
+  drawWaveform();
+}
+
+function setSeekPosition(event) {
+  seekWaveform(event);
+}
+
+function setSeg(type, value) {
+  state[type] = type === 'groove' ? value : Number(value);
+  document.querySelectorAll(`.seg-btn[data-type="${type}"]`).forEach((button) => {
+    button.classList.toggle('active', button.dataset.val === String(value));
+  });
+  updateInfo();
+  drawVinyl();
+}
+
+document.querySelectorAll('.seg-btn[data-type]').forEach((button) => {
+  button.addEventListener('click', () => setSeg(button.dataset.type, button.dataset.val));
+});
+
+[els.trackSplitModeAuto, els.trackSplitModeSeparate].forEach((button) => {
+  button.addEventListener('click', () => {
+    const mode = button.dataset.mode;
+    if (!mode) return;
+    state.multiFilesMode = mode;
+    els.trackSplitModeAuto.classList.toggle('active', mode === 'auto');
+    els.trackSplitModeSeparate.classList.toggle('active', mode === 'separate');
+    if (mode === 'auto') {
+      els.autoSplitModeUI.style.display = 'block';
+      els.separateModeUI.style.display = 'none';
+      els.trackSplitModeDesc.textContent = '自動分割時はA/B別指定不可。ファイルの順序だけ選択できます。';
+    } else {
+      els.autoSplitModeUI.style.display = 'none';
+      els.separateModeUI.style.display = 'block';
+      els.trackSplitModeDesc.textContent = 'A面/B面別のファイルを個別に指定できます。';
+    }
+    updateGenerateButtonState();
+  });
+});
+
+
+// 溝ピッチスライダーのイベント
+els.grooveSpacingSlider.addEventListener('input', () => {
+  state.grooveSpacingFactor = parseFloat(els.grooveSpacingSlider.value);
+  els.grooveSpacingValue.textContent = state.grooveSpacingFactor.toFixed(1) + '×';
+  
+  // 警告チェック
+  const factor = state.grooveSpacingFactor;
+  let warning = '';
+  if (factor > 1.5) {
+    warning = '⚠ 短くなります';
+    els.grooveSpacingWarning.style.color = '#ff9800';
+  } else if (factor < 0.7) {
+    warning = '⚠ 長くなります';
+    els.grooveSpacingWarning.style.color = '#ff9800';
+  }
+  els.grooveSpacingWarning.textContent = warning;
+  
+  updateInfo();
+  drawVinyl();
+  drawWaveform();
+});
+
+function updateMultiFileModeUI() {
+  if (state.multiFilesMode === 'auto') {
+    els.multiFileContainer.style.display = 'block';
+    els.autoSplitModeUI.style.display = 'block';
+    els.separateModeUI.style.display = 'none';
+    els.trackSplitModeDesc.textContent = 'ファイルを順序通りに選択します';
+    els.trackSplitModeAuto.classList.add('active');
+    els.trackSplitModeSeparate.classList.remove('active');
+  } else {
+    els.multiFileContainer.style.display = 'block';
+    els.autoSplitModeUI.style.display = 'none';
+    els.separateModeUI.style.display = 'block';
+    els.trackSplitModeDesc.textContent = 'A面/B面別のファイルを個別に指定できます。';
+    els.trackSplitModeAuto.classList.remove('active');
+    els.trackSplitModeSeparate.classList.add('active');
+  }
+  updateGenerateButtonState();
+}
+
+// 複数ファイル機能
+
+// Auto-split mode handlers
+els.multiFileInputAuto.addEventListener('change', () => {
+  if (els.multiFileInputAuto.files.length > 0) {
+    setAutoFiles(Array.from(els.multiFileInputAuto.files));
+  }
+});
+
+els.multiDropZoneAuto.addEventListener('dragover', (event) => {
+  event.preventDefault();
+  els.multiDropZoneAuto.classList.add('drag-over');
+});
+
+els.multiDropZoneAuto.addEventListener('dragleave', () => {
+  els.multiDropZoneAuto.classList.remove('drag-over');
+});
+
+els.multiDropZoneAuto.addEventListener('drop', (event) => {
+  event.preventDefault();
+  els.multiDropZoneAuto.classList.remove('drag-over');
+  if (event.dataTransfer.files.length > 0) {
+    setAutoFiles(Array.from(event.dataTransfer.files));
+  }
+});
+
+function setAutoFiles(files) {
+  state.multiFiles = files;
+  const content = files.map((file, idx) => `
+    <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px; background: var(--panel); border-radius: 4px; font-size: 11px;">
+      <span>${idx + 1}. ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)</span>
+      <button type="button" data-idx="${idx}" class="multi-auto-remove-btn" style="background: transparent; border: none; color: #ff7979; cursor: pointer; font-size: 14px;">✕</button>
+    </div>
+  `).join('');
+
+  els.filesListContentAuto.innerHTML = content;
+  els.multiFilesListAuto.style.display = files.length > 0 ? 'block' : 'none';
+
+  document.querySelectorAll('.multi-auto-remove-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const idx = parseInt(e.target.dataset.idx);
+      state.multiFiles = state.multiFiles.filter((_, i) => i !== idx);
+      setAutoFiles(state.multiFiles);
+    });
+  });
+  updateGenerateButtonState();
+}
+
+// Separate A/B side handlers
+els.multiFileInputA.addEventListener('change', () => {
+  if (els.multiFileInputA.files.length > 0) {
+    setSideFiles('A', Array.from(els.multiFileInputA.files));
+  }
+});
+
+els.multiDropZoneA.addEventListener('dragover', (event) => {
+  event.preventDefault();
+  els.multiDropZoneA.classList.add('drag-over');
+});
+
+els.multiDropZoneA.addEventListener('dragleave', () => {
+  els.multiDropZoneA.classList.remove('drag-over');
+});
+
+els.multiDropZoneA.addEventListener('drop', (event) => {
+  event.preventDefault();
+  els.multiDropZoneA.classList.remove('drag-over');
+  if (event.dataTransfer.files.length > 0) {
+    setSideFiles('A', Array.from(event.dataTransfer.files));
+  }
+});
+
+els.multiFileInputB.addEventListener('change', () => {
+  if (els.multiFileInputB.files.length > 0) {
+    setSideFiles('B', Array.from(els.multiFileInputB.files));
+  }
+});
+
+els.multiDropZoneB.addEventListener('dragover', (event) => {
+  event.preventDefault();
+  els.multiDropZoneB.classList.add('drag-over');
+});
+
+els.multiDropZoneB.addEventListener('dragleave', () => {
+  els.multiDropZoneB.classList.remove('drag-over');
+});
+
+els.multiDropZoneB.addEventListener('drop', (event) => {
+  event.preventDefault();
+  els.multiDropZoneB.classList.remove('drag-over');
+  if (event.dataTransfer.files.length > 0) {
+    setSideFiles('B', Array.from(event.dataTransfer.files));
+  }
+});
+
+function setSideFiles(side, files) {
+  if (side === 'A') {
+    state.filesA = files;
+  } else {
+    state.filesB = files;
+  }
+  updateSideFileList(side);
+}
+
+function updateSideFileList(side) {
+  const files = side === 'A' ? state.filesA : state.filesB;
+  const content = files.map((file, idx) => `
+    <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px; background: var(--panel); border-radius: 4px; font-size: 11px;">
+      <span>${idx + 1}. ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)</span>
+      <button type="button" data-idx="${idx}" data-side="${side}" class="multi-side-remove-btn" style="background: transparent; border: none; color: #ff7979; cursor: pointer; font-size: 14px;">✕</button>
+    </div>
+  `).join('');
+
+  const listElement = side === 'A' ? els.filesListContentA : els.filesListContentB;
+  const container = side === 'A' ? els.multiFilesListA : els.multiFilesListB;
+  listElement.innerHTML = content;
+  container.style.display = files.length > 0 ? 'block' : 'none';
+
+  document.querySelectorAll('.multi-side-remove-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const idx = parseInt(e.target.dataset.idx);
+      const sideKey = e.target.dataset.side;
+      if (sideKey === 'A') {
+        state.filesA = state.filesA.filter((_, i) => i !== idx);
+        updateSideFileList('A');
+      } else {
+        state.filesB = state.filesB.filter((_, i) => i !== idx);
+        updateSideFileList('B');
+      }
+    });
+  });
+  updateGenerateButtonState();
+}
+
+els.silenceBetweenSelectAuto.addEventListener('change', () => {
+  state.silenceBetween = parseFloat(els.silenceBetweenSelectAuto.value);
+});
+
+els.silenceBetweenSelectA.addEventListener('change', () => {
+  state.silenceBetweenA = parseFloat(els.silenceBetweenSelectA.value);
+});
+
+els.silenceBetweenSelectB.addEventListener('change', () => {
+  state.silenceBetweenB = parseFloat(els.silenceBetweenSelectB.value);
+});
+
+
+function drawVinyl() {
+  const cv = document.getElementById('vinylCanvas');
+  const ctx = cv.getContext('2d');
+  const W = cv.width;
+  const H = cv.height;
+  const cx = W / 2;
+  const cy = H / 2;
+  const spec = SPECS[state.size];
+  const g = RPM_G[state.rpm];
+  const scale = (W / 2 - 8) / spec.outer_r;
+
+  ctx.clearRect(0, 0, W, H);
+  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, cx);
+  grad.addColorStop(0, '#22222e');
+  grad.addColorStop(.4, '#1a1a24');
+  grad.addColorStop(1, '#0d0d12');
+  ctx.beginPath();
+  ctx.arc(cx, cy, spec.outer_r * scale, 0, Math.PI * 2);
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  const adjustedSpacing = g.sp * state.grooveSpacingFactor;
+  const pitch = (g.w + adjustedSpacing) * scale;
+  const rOut = spec.groove_outer * scale;
+  const rIn = spec.groove_inner * scale;
+  const turns = (spec.groove_outer - spec.groove_inner) / (g.w + adjustedSpacing);
+  const steps = Math.ceil(turns * 60);
+
+  ctx.strokeStyle = '#2a2a3a';
+  ctx.lineWidth = Math.max(.5, pitch * .6);
+  ctx.beginPath();
+  for (let i = 0; i <= steps; i++) {
+    const frac = i / steps;
+    const angle = -frac * turns * 2 * Math.PI;
+    const r = rOut - frac * (rOut - rIn);
+    const x = cx + r * Math.cos(angle);
+    const y = cy + r * Math.sin(angle);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  const waveform = getWaveformSamples();
+  if (waveform && waveform.length) {
+    const info = calcMaxDuration(state.size, state.rpm, state.grooveSpacingFactor);
+    const maxSamples = Math.min(waveform.length, info.duration * state.audioSampleRate);
+    ctx.strokeStyle = '#e8c840';
+    ctx.lineWidth = Math.max(.3, pitch * .25);
+    ctx.beginPath();
+    for (let i = 0; i <= steps; i++) {
+      const frac = i / steps;
+      const angle = -frac * turns * 2 * Math.PI;
+      const si = Math.floor(frac * maxSamples);
+      const amp = waveform[si] || 0;
+      const r = rOut - frac * (rOut - rIn) + amp * pitch * .35;
+      const x = cx + r * Math.cos(angle);
+      const y = cy + r * Math.sin(angle);
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+
+  const label = ctx.createRadialGradient(cx, cy, 0, cx, cy, spec.label_r * scale);
+  label.addColorStop(0, '#2c2c3c');
+  label.addColorStop(1, '#1e1e2c');
+  ctx.beginPath();
+  ctx.arc(cx, cy, spec.label_r * scale, 0, Math.PI * 2);
+  ctx.fillStyle = label;
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, spec.hole_r * scale, 0, Math.PI * 2);
+  ctx.fillStyle = '#0a0a0c';
+  ctx.fill();
+
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#e8c84090';
+  ctx.font = "bold 16px 'Bebas Neue', sans-serif";
+  ctx.fillText(`${state.rpm} RPM · ${state.size}"`, cx, cy - 6);
+  ctx.fillStyle = '#77778a';
+  ctx.font = "11px 'DM Mono', monospace";
+  ctx.fillText(state.groove.toUpperCase(), cx, cy + 12);
+}
+
+function drawWaveform() {
+  const cv = document.getElementById('waveCanvas');
+  const ctx = cv.getContext('2d');
+  const ratio = window.devicePixelRatio || 1;
+  cv.width = Math.max(800, cv.offsetWidth * ratio);
+  cv.height = 90 * ratio;
+  ctx.clearRect(0, 0, cv.width, cv.height);
+
+  const W = cv.width;
+  const H = cv.height;
+  const mid = H / 2;
+  const samples = getWaveformSamples();
+  ctx.fillStyle = '#0f0f18';
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = '#333344';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, mid);
+  ctx.lineTo(W, mid);
+  ctx.stroke();
+
+  if (!samples || !samples.length) {
+    ctx.fillStyle = 'rgba(232,200,64,0.1)';
+    ctx.fillRect(0, 0, W, H);
+    return;
+  }
+
+  const zoom = Math.max(1, state.waveformZoom);
+  const total = samples.length;
+  const visibleCount = Math.max(64, Math.min(total, Math.floor(total / zoom)));
+  const currentIndex = audioPlayer.duration ? Math.floor((audioPlayer.currentTime / audioPlayer.duration) * total) : 0;
+  let start = Math.max(0, currentIndex - Math.floor(visibleCount / 2));
+  let end = Math.min(total, start + visibleCount);
+  if (end - start < visibleCount) {
+    start = Math.max(0, end - visibleCount);
+  }
+  const visible = samples.slice(start, end);
+
+  const peak = Math.max(...visible.map((v) => Math.abs(v)), 0.001);
+  const drawStep = Math.max(1, Math.floor(visible.length / W));
+  const baseColor = state.waveformChannel === 'left' ? '#e8c840' : state.waveformChannel === 'right' ? '#6bb7ff' : '#d8d8e8';
+  ctx.strokeStyle = baseColor;
+  ctx.lineWidth = 2 * ratio;
+  ctx.beginPath();
+  for (let x = 0; x < W; x++) {
+    const idx = start + Math.min(visible.length - 1, x * drawStep);
+    const value = samples[idx] || 0;
+    const y = mid - (value / peak) * (mid * 0.85);
+    x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  if (state.waveformChannels === 2 && state.waveformChannel === 'auto') {
+    const left = state.waveformLeft || [];
+    const right = state.waveformRight || [];
+    if (left.length && right.length) {
+      const drawOverlay = right.slice(start, end);
+      ctx.strokeStyle = 'rgba(107,183,255,0.5)';
+      ctx.lineWidth = 1.2 * ratio;
+      ctx.beginPath();
+      for (let x = 0; x < W; x++) {
+        const idx = start + Math.min(drawOverlay.length - 1, x * drawStep);
+        const value = drawOverlay[idx] || 0;
+        const y = mid - (value / peak) * (mid * 0.65);
+        x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+  }
+
+  if (audioPlayer.duration) {
+    const pos = audioPlayer.currentTime / audioPlayer.duration;
+    const markerX = Math.max(0, Math.min(W, (currentIndex - start) / Math.max(1, visible.length - 1) * W));
+    ctx.strokeStyle = 'rgba(232,200,64,0.6)';
+    ctx.lineWidth = 1 * ratio;
+    ctx.beginPath();
+    ctx.moveTo(markerX, 0);
+    ctx.lineTo(markerX, H);
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = '#b0b0b0';
+  ctx.font = `${12 * ratio}px 'DM Mono', monospace`;
+  ctx.fillText(formatWaveformInfo(), 12 * ratio, 16 * ratio);
+}
+
+function setProgress(percent, message) {
+  els.progressBar.style.width = `${percent}%`;
+  els.progressMsg.textContent = message;
+}
+
+async function checkServer() {
+  const dot = document.getElementById('serverDot');
+  const text = document.getElementById('serverText');
+  try {
+    const res = await fetch(new URL('/api/health', API_BASE_URL).href);
+    if (!res.ok) throw new Error('bad status');
+    dot.className = 'dot ready';
+    text.textContent = 'server ready';
+  } catch (error) {
+    dot.className = 'dot error';
+    text.textContent = '起動: gui_server.py';
+  }
+}
+
+async function generate() {
+  if (!isGenerateEnabled()) return;
+  els.formError.textContent = '';
+  els.progress.classList.add('show');
+  setProgress(10, '音声ファイルをアップロード中...');
+
+  const data = new FormData();
+  let mainAudioFile = null;
+  if (state.multiFilesMode === 'auto' && state.multiFiles.length > 0) {
+    mainAudioFile = state.multiFiles[0];
+  } else if (state.multiFilesMode === 'separate' && state.filesA.length > 0) {
+    mainAudioFile = state.filesA[0];
+  }
+
+  if (!mainAudioFile) {
+    els.formError.textContent = '音声ファイルを選択してください';
+    els.progress.classList.remove('show');
+    return;
+  }
+
+  data.append('audio', mainAudioFile);
+  data.append('size', String(state.size));
+  data.append('rpm', String(state.rpm));
+  data.append('groove', state.groove);
+  const hasBFiles = state.multiFilesMode === 'separate' && state.filesB.length > 0;
+  data.append('sides', String(hasBFiles ? 2 : 1));
+  data.append('split_mode', 'duplicate');
+  data.append('quality', els.qualitySelect.value);
+  data.append('output_mode', els.modeSelect.value);
+  data.append('output_format', els.outputFormatSelect.value);
+  data.append('apply_riaa', els.riaaToggle.checked ? '1' : '0');
+  data.append('groove_spacing_factor', String(state.grooveSpacingFactor));
+  data.append('lang', 'ja');
+
+  if (state.multiFilesMode === 'auto') {
+    data.append('multi_files_mode', 'auto');
+    const additionalFiles = state.multiFiles.slice(1);
+    additionalFiles.forEach((file, idx) => {
+      data.append(`audio_${idx}`, file);
+    });
+    data.append('multi_files_count', String(additionalFiles.length));
+    data.append('silence_between', String(state.silenceBetween));
+  } else if (state.multiFilesMode === 'separate') {
+    data.append('multi_files_mode', 'separate');
+    data.append('multi_files_a_count', String(state.filesA.length));
+    state.filesA.forEach((file, idx) => {
+      data.append(`audio_a_${idx}`, file);
+    });
+    data.append('multi_files_b_count', String(state.filesB.length));
+    state.filesB.forEach((file, idx) => {
+      data.append(`audio_b_${idx}`, file);
+    });
+    data.append('silence_between_a', String(state.silenceBetweenA));
+    data.append('silence_between_b', String(state.silenceBetweenB));
+  } else {
+    data.append('multi_files_mode', 'none');
+  }
+
+  try {
+    setProgress(35, 'STLを生成中...');
+    const res = await fetch(new URL('/api/generate', API_BASE_URL).href, { method: 'POST', body: data });
+    const result = await res.json();
+    if (!res.ok || !result.ok) {
+      const log = result.log ? `\n\n${result.log.slice(-1200)}` : '';
+      throw new Error((result.error || '生成に失敗しました') + log);
+    }
+    setProgress(100, '完了');
+    showOutput(result);
+  } catch (error) {
+    els.formError.textContent = error.message;
+  } finally {
+    window.setTimeout(() => {
+      els.progress.classList.remove('show');
+      setProgress(0, '');
+    }, 450);
+  }
+}
+
+function showOutput(result) {
+  const report = result.report || {};
+  const record = report.record || {};
+  const groove = report.groove || {};
+  const audio = report.audio || {};
+  const stl = report.stl_output || {};
+  const files = result.files || [];
+
+  const items = [
+    ['サイズ', `${record.size_inch || state.size}" (${record.diameter_mm || '-'} mm)`],
+    ['RPM', record.rpm || state.rpm],
+    ['溝方式', (record.groove_mode || state.groove).toUpperCase()],
+    ['面数', record.sides || 1],
+    ['面モード', record.split_mode === 'auto' ? '自動分割' : '両面複製'],
+    ['音声時間', fmtSec(audio.actual_duration_s)],
+    ['最大収録時間', fmtSec(audio.max_duration_s)],
+    ['各面の音声時間', (audio.side_durations_s || []).map(fmtSec).join(' / ') || '-'],
+    ['溝の巻き数', groove.turns || '-'],
+    ['三角形数', (stl.total_triangles || 0).toLocaleString()],
+  ];
+
+  document.getElementById('outputGrid').innerHTML = items.map(([key, val]) => (
+    `<div class="output-card"><div class="key">${escapeHtml(key)}</div><div class="val">${escapeHtml(String(val))}</div></div>`
+  )).join('');
+
+  document.getElementById('downloadBtns').innerHTML = files.map((file) => {
+    const resolvedUrl = file.url.startsWith('http') ? file.url : new URL(file.url, API_BASE_URL).href;
+    return `<a class="dl-btn" href="${resolvedUrl}" download>${escapeHtml(file.name)}</a>`;
+  }).join('');
+
+  document.getElementById('Log').textContent = result.log || '';
+  document.getElementById('outputPanel').classList.add('show');
+
+  const stlFile = files.find((file) => file.name.toLowerCase().endsWith('.stl'));
+  if (stlFile) {
+    els.stlUploadStatus.textContent = `生成されたSTLを検証中: ${stlFile.name}`;
+    fetchStlAndVerify(stlFile.url, stlFile.name).catch((error) => {
+      console.warn('Auto verify generated STL failed', error);
+    });
+  }
+}
+
+function escapeHtml(value) {
+  return value.replace(/[&<>"']/g, (ch) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  })[ch]);
+}
+
+els.genBtn.addEventListener('click', generate);
+els.openDownloads.addEventListener('click', openDownloadsPanel);
+els.stlDropZone.addEventListener('click', () => els.stlFileInput.click());
+els.stlFileInput.addEventListener('change', async () => {
+  if (els.stlFileInput.files.length > 0) {
+    await uploadStlFile(els.stlFileInput.files[0]);
+  }
+});
+els.stlDropZone.addEventListener('dragover', (event) => {
+  event.preventDefault();
+  els.stlDropZone.classList.add('drag-over');
+});
+els.stlDropZone.addEventListener('dragleave', () => {
+  els.stlDropZone.classList.remove('drag-over');
+});
+els.stlDropZone.addEventListener('drop', async (event) => {
+  event.preventDefault();
+  els.stlDropZone.classList.remove('drag-over');
+  if (event.dataTransfer.files.length > 0) {
+    await uploadStlFile(event.dataTransfer.files[0]);
+  }
+});
+els.audioPlayBtn.addEventListener('click', () => {
+  audioPlayer.play();
+  setAudioStatus('Playing');
+});
+els.audioPauseBtn.addEventListener('click', () => {
+  audioPlayer.pause();
+  setAudioStatus('Paused');
+});
+const waveCanvas = document.getElementById('waveCanvas');
+waveCanvas.addEventListener('click', setSeekPosition);
+let waveDrag = false;
+waveCanvas.addEventListener('mousedown', (event) => {
+  waveDrag = true;
+  seekWaveform(event);
+});
+window.addEventListener('mousemove', (event) => {
+  if (waveDrag) {
+    seekWaveform(event);
+  }
+});
+window.addEventListener('mouseup', () => {
+  waveDrag = false;
+});
+
+els.waveZoomSlider.addEventListener('input', () => {
+  state.waveformZoom = parseFloat(els.waveZoomSlider.value);
+  els.waveZoomValue.textContent = `${state.waveformZoom.toFixed(1)}×`;
+  drawWaveform();
+});
+
+els.waveChannelGroup.querySelectorAll('.channel-btn').forEach((button) => {
+  button.addEventListener('click', () => {
+    const channel = button.dataset.channel;
+    state.waveformChannel = channel;
+    els.waveChannelGroup.querySelectorAll('.channel-btn').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.channel === channel);
+    });
+    drawWaveform();
+  });
+});
+
+document.getElementById('closeOutput').addEventListener('click', () => {
+  document.getElementById('outputPanel').classList.remove('show');
+});
+window.addEventListener('resize', () => drawWaveform());
+
+checkServer();
+updateMultiFileModeUI();
+updateInfo();
+drawVinyl();
+drawWaveform(null);
+</script>
+</body>
+</html>

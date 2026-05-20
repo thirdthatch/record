@@ -1,0 +1,1226 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D Vinyl Record Generator</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Bebas+Neue&family=DM+Sans:wght@300;400;500&display=swap');
+
+  :root {
+    --bg:     #0a0a0c;
+    --panel:  #111116;
+    --border: #222230;
+    --groove: #1a1a28;
+    --accent: #e8c840;
+    --accent2:#ff6b35;
+    --text:   #d8d8e8;
+    --muted:  #555568;
+    --vinyl:  #1c1c24;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Layout ───────────────────────────────────────────────────────── */
+  .container {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    grid-template-rows: auto 1fr;
+    height: 100vh;
+    gap: 0;
+  }
+
+  /* ── Header ───────────────────────────────────────────────────────── */
+  header {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 32px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+  }
+
+  .logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    letter-spacing: 3px;
+    color: var(--accent);
+  }
+
+  .logo span { color: var(--text); opacity: 0.5; }
+
+  .lang-toggle {
+    display: flex;
+    gap: 4px;
+    background: var(--groove);
+    border-radius: 6px;
+    padding: 3px;
+  }
+  .lang-btn {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    padding: 5px 12px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all .2s;
+  }
+  .lang-btn.active { background: var(--accent); color: #000; }
+
+  /* ── Sidebar (controls) ───────────────────────────────────────────── */
+  .sidebar {
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .section-title {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  /* ── Card ─────────────────────────────────────────────────────────── */
+  .card {
+    background: var(--groove);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+
+  /* ── Segment controls (pill selectors) ───────────────────────────── */
+  .seg-group {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+  .seg-btn {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    padding: 7px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all .15s;
+    flex: 1;
+    text-align: center;
+  }
+  .seg-btn:hover  { border-color: var(--accent); color: var(--text); }
+  .seg-btn.active { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 500; }
+
+  /* ── Toggle switch ────────────────────────────────────────────────── */
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 10px;
+  }
+  .toggle-label { font-size: 13px; color: var(--text); }
+  .toggle {
+    position: relative;
+    width: 44px; height: 24px;
+  }
+  .toggle input { display: none; }
+  .toggle-track {
+    position: absolute; inset: 0;
+    background: var(--border);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background .2s;
+  }
+  .toggle input:checked + .toggle-track { background: var(--accent); }
+  .toggle-thumb {
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 18px; height: 18px;
+    background: #fff;
+    border-radius: 50%;
+    transition: left .2s;
+    pointer-events: none;
+  }
+  .toggle input:checked ~ .toggle-thumb { left: 23px; }
+
+  /* ── Drop zone ────────────────────────────────────────────────────── */
+  .drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    padding: 24px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: all .2s;
+    position: relative;
+  }
+  .drop-zone:hover, .drop-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(232,200,64,.04);
+  }
+  .drop-zone input[type=file] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+  .drop-icon { font-size: 28px; margin-bottom: 6px; }
+  .drop-text { font-size: 13px; color: var(--muted); }
+  .drop-text strong { color: var(--text); }
+  .file-name {
+    margin-top: 8px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--accent2);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* ── Mic button ───────────────────────────────────────────────────── */
+  .mic-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 10px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all .2s;
+    margin-top: 8px;
+  }
+  .mic-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+  .mic-btn.recording { border-color: #e74c3c; color: #e74c3c; animation: pulse 1s infinite; }
+
+  @keyframes pulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(231,76,60,0.4); }
+    50%      { box-shadow: 0 0 0 6px rgba(231,76,60,0); }
+  }
+
+  /* ── Generate button ──────────────────────────────────────────────── */
+  .gen-btn {
+    width: 100%;
+    padding: 14px;
+    background: var(--accent);
+    border: none;
+    border-radius: 8px;
+    color: #000;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 18px;
+    letter-spacing: 2px;
+    cursor: pointer;
+    transition: all .2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .gen-btn:hover { background: #f0d44a; transform: translateY(-1px); }
+  .gen-btn:active { transform: translateY(0); }
+  .gen-btn:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; transform: none; }
+
+  /* ── Main area ────────────────────────────────────────────────────── */
+  .main {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding-bottom: 100px;
+    background: var(--bg);
+  }
+
+  /* ── Vinyl preview canvas ─────────────────────────────────────────── */
+  .preview-area {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  canvas#vinylCanvas {
+    border-radius: 50%;
+    box-shadow: 0 0 80px rgba(0,0,0,.8), 0 0 20px rgba(232,200,64,.06);
+    max-width: 420px;
+    max-height: 420px;
+    width: min(420px, calc(100% - 32px));
+    height: min(420px, calc(100% - 32px));
+  }
+
+  /* ── Waveform canvas ─────────────────────────────────────────────── */
+  .waveform-area {
+    height: 110px;
+    border-top: 1px solid var(--border);
+    padding: 12px 24px;
+    background: var(--panel);
+    position: relative;
+  }
+  .waveform-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    position: absolute;
+    top: 12px; left: 24px;
+  }
+  canvas#waveCanvas {
+    width: 100%;
+    height: 70px;
+    margin-top: 20px;
+    display: block;
+  }
+
+  /* ── Info bar ────────────────────────────────────────────────────── */
+  .info-bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-top: 1px solid var(--border);
+    padding: 10px 24px;
+    background: var(--panel);
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    align-items: center;
+    z-index: 1;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
+  }
+  .info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .info-key {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .info-val {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: var(--accent);
+  }
+
+  /* ── Output panel ────────────────────────────────────────────────── */
+  .output-panel {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.8);
+    backdrop-filter: blur(6px);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+  .output-panel.show { display: flex; }
+  .output-box {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+    max-width: 560px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+  .output-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 24px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    margin-bottom: 20px;
+  }
+  .output-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .output-card {
+    background: var(--groove);
+    border-radius: 8px;
+    padding: 12px;
+  }
+  .output-card .key {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .output-card .val {
+    font-family: 'DM Mono', monospace;
+    font-size: 14px;
+    color: var(--text);
+  }
+  .download-btns {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .dl-btn {
+    flex: 1;
+    padding: 12px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    transition: all .2s;
+  }
+  .dl-btn.stl   { background: var(--accent); color: #000; }
+  .dl-btn.json  { background: var(--border); color: var(--text); }
+  .dl-btn.cmd   { background: var(--groove); color: var(--accent); border: 1px solid var(--accent); }
+  .dl-btn:hover { opacity: .85; }
+  .close-btn {
+    width: 100%;
+    padding: 11px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    cursor: pointer;
+    transition: all .2s;
+  }
+  .close-btn:hover { color: var(--text); border-color: var(--text); }
+
+  .cmd-block {
+    background: var(--groove);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 16px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--accent2);
+    line-height: 1.7;
+    word-break: break-all;
+  }
+
+  /* ── Progress overlay ────────────────────────────────────────────── */
+  .progress-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.7);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+  }
+  .progress-overlay.show { display: flex; }
+  .progress-box {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px 36px;
+    text-align: center;
+    min-width: 300px;
+  }
+  .progress-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 20px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    margin-bottom: 16px;
+  }
+  .progress-bar-wrap {
+    background: var(--groove);
+    border-radius: 4px;
+    height: 6px;
+    overflow: hidden;
+    margin-bottom: 12px;
+  }
+  .progress-bar {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 4px;
+    transition: width .2s;
+    width: 0%;
+  }
+  .progress-msg {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  /* ── Scrollbar ───────────────────────────────────────────────────── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  @media (max-width: 760px) {
+    .container { grid-template-columns: 1fr; grid-template-rows: auto auto 1fr; }
+    .sidebar { border-right: none; border-bottom: 1px solid var(--border); }
+    .main { min-height: 60vh; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- ── Header ─────────────────────────────────────────────────────── -->
+  <header>
+    <div class="logo">VINYL<span>  ▸  </span>3D</div>
+    <div class="lang-toggle">
+      <button class="lang-btn active" onclick="setLang('ja')">日本語</button>
+      <button class="lang-btn"        onclick="setLang('en')">EN</button>
+    </div>
+  </header>
+
+  <!-- ── Sidebar ────────────────────────────────────────────────────── -->
+  <aside class="sidebar">
+
+    <!-- Audio Input -->
+    <div class="card">
+      <div class="section-title" data-i18n="audio_input">音声入力</div>
+      <div class="drop-zone" id="dropZone">
+        <input type="file" id="fileInput" accept=".wav,.mp3">
+        <div class="drop-icon">🎵</div>
+        <div class="drop-text">
+          <strong data-i18n="drop_file">ファイルをドロップ</strong><br>
+          <span data-i18n="drop_sub">WAV / MP3</span>
+        </div>
+        <div class="file-name" id="fileName"></div>
+      </div>
+      <button class="mic-btn" id="micBtn" onclick="toggleMic()">
+        <span id="micIcon">🎙</span>
+        <span id="micLabel" data-i18n="mic_start">マイク録音</span>
+      </button>
+      <div id="recTimer" style="text-align:center;font-family:'DM Mono',monospace;font-size:12px;color:var(--accent2);margin-top:6px;display:none;">00:00</div>
+    </div>
+
+    <!-- Record Size -->
+    <div class="card">
+      <div class="section-title" data-i18n="record_size">レコードサイズ</div>
+      <div class="seg-group" id="sizeGroup">
+        <button class="seg-btn" data-val="7"  onclick="setSeg('size',7)">7"</button>
+        <button class="seg-btn" data-val="10" onclick="setSeg('size',10)">10"</button>
+        <button class="seg-btn active" data-val="12" onclick="setSeg('size',12)">12"</button>
+      </div>
+    </div>
+
+    <!-- RPM -->
+    <div class="card">
+      <div class="section-title" data-i18n="rpm_label">回転数 (RPM)</div>
+      <div class="seg-group" id="rpmGroup">
+        <button class="seg-btn active" data-val="33" onclick="setSeg('rpm',33)">33 RPM</button>
+        <button class="seg-btn" data-val="45" onclick="setSeg('rpm',45)">45 RPM</button>
+        <button class="seg-btn" data-val="78" onclick="setSeg('rpm',78)">78 RPM</button>
+      </div>
+    </div>
+
+    <!-- Groove Mode -->
+    <div class="card">
+      <div class="section-title" data-i18n="groove_mode">溝方式</div>
+      <div class="seg-group" id="grooveGroup">
+        <button class="seg-btn active" data-val="mono"   onclick="setSeg('groove','mono')">MONO</button>
+        <button class="seg-btn"        data-val="stereo" onclick="setSeg('groove','stereo')">STEREO</button>
+      </div>
+    </div>
+
+    <!-- Sides -->
+    <div class="card">
+      <div class="section-title" data-i18n="sides_label">面数</div>
+      <div class="toggle-row">
+        <span class="toggle-label" data-i18n="both_sides">両面 (A/B)</span>
+        <label class="toggle">
+          <input type="checkbox" id="sidesToggle" onchange="updateInfo()">
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+      </div>
+    </div>
+
+    <!-- Generate -->
+    <button class="gen-btn" id="genBtn" onclick="generate()" disabled>
+      <span data-i18n="generate_btn">STL を生成する</span>
+    </button>
+
+  </aside>
+
+  <!-- ── Main ───────────────────────────────────────────────────────── -->
+  <main class="main">
+    <div class="preview-area">
+      <canvas id="vinylCanvas" width="420" height="420"></canvas>
+    </div>
+
+    <div class="waveform-area">
+      <div class="waveform-label" data-i18n="waveform">WAVEFORM</div>
+      <canvas id="waveCanvas" width="800" height="70"></canvas>
+    </div>
+
+    <div class="info-bar" id="infoBar">
+      <div class="info-item">
+        <div class="info-key" data-i18n="max_time">最大収録時間</div>
+        <div class="info-val" id="infoMaxDur">—</div>
+      </div>
+      <div class="info-item">
+        <div class="info-key" data-i18n="audio_dur">音声時間</div>
+        <div class="info-val" id="infoAudioDur">—</div>
+      </div>
+      <div class="info-item">
+        <div class="info-key" data-i18n="groove_turns_k">溝の巻き数</div>
+        <div class="info-val" id="infoTurns">—</div>
+      </div>
+      <div class="info-item">
+        <div class="info-key" data-i18n="groove_len_k">溝の総延長</div>
+        <div class="info-val" id="infoGrooveLen">—</div>
+      </div>
+      <div class="info-item">
+        <div class="info-key" data-i18n="printer_rec">推奨プリンター</div>
+        <div class="info-val" id="infoPrinter">SLA / DLP</div>
+      </div>
+    </div>
+  </main>
+
+</div>
+
+<!-- ── Progress overlay ──────────────────────────────────────────── -->
+<div class="progress-overlay" id="progressOverlay">
+  <div class="progress-box">
+    <div class="progress-title" data-i18n="generating_stl">STL 生成中…</div>
+    <div class="progress-bar-wrap"><div class="progress-bar" id="progressBar"></div></div>
+    <div class="progress-msg" id="progressMsg"></div>
+  </div>
+</div>
+
+<!-- ── Output panel ───────────────────────────────────────────────── -->
+<div class="output-panel" id="outputPanel">
+  <div class="output-box">
+    <div class="output-title" data-i18n="output_title">出力完了</div>
+
+    <div class="output-grid" id="outputGrid"></div>
+
+    <div class="download-btns" id="downloadBtns"></div>
+
+    <div id="cmdSection">
+      <div class="section-title" style="margin-bottom:8px" data-i18n="cli_cmd">CLIコマンド（Python）</div>
+      <div class="cmd-block" id="cmdBlock"></div>
+    </div>
+
+    <button class="close-btn" onclick="closeOutput()" data-i18n="close_btn">閉じる</button>
+  </div>
+</div>
+
+<script>
+// ── i18n ──────────────────────────────────────────────────────────────────
+const I18N = {
+  ja: {
+    audio_input: "音声入力", drop_file: "ファイルをドロップ", drop_sub: "WAV / MP3",
+    mic_start: "マイク録音", mic_stop: "録音を停止", record_size: "レコードサイズ",
+    rpm_label: "回転数 (RPM)", groove_mode: "溝方式", sides_label: "面数",
+    both_sides: "両面 (A/B)", generate_btn: "STL を生成する", waveform: "波形",
+    max_time: "最大収録時間", audio_dur: "音声時間", groove_turns_k: "溝の巻き数",
+    groove_len_k: "溝の総延長", printer_rec: "推奨プリンター",
+    generating_stl: "STL 生成中…", output_title: "出力完了",
+    cli_cmd: "CLIコマンド（Python）", close_btn: "閉じる",
+    step_decode: "音声デコード中…", step_resample: "リサンプリング中…",
+    step_groove: "溝パスを計算中…", step_stl: "STLジオメトリ構築中…",
+    step_write: "STLファイルを書き込み中…", step_done: "完了！",
+    dl_stl: "STL ダウンロード", dl_json: "レポート JSON", dl_cmd: "CLIコマンドをコピー",
+    info_size: "サイズ", info_rpm: "RPM", info_groove: "溝方式",
+    info_sides: "面数", info_triangles: "三角形数", info_duration: "収録時間",
+    layer_h: "積層ピッチ", nozzle: "ノズル径", material: "材料", infill: "充填率",
+    note: "注意",
+    warn_too_long: "※ 音声が長すぎます。最大収録時間に切り詰めて処理します。",
+  },
+  en: {
+    audio_input: "Audio Input", drop_file: "Drop file here", drop_sub: "WAV / MP3",
+    mic_start: "Record from Mic", mic_stop: "Stop Recording", record_size: "Record Size",
+    rpm_label: "Rotation Speed (RPM)", groove_mode: "Groove Mode", sides_label: "Sides",
+    both_sides: "Both sides (A/B)", generate_btn: "Generate STL", waveform: "WAVEFORM",
+    max_time: "Max Duration", audio_dur: "Audio Duration", groove_turns_k: "Groove Turns",
+    groove_len_k: "Groove Length", printer_rec: "Recommended Printer",
+    generating_stl: "Generating STL…", output_title: "Output Ready",
+    cli_cmd: "CLI Command (Python)", close_btn: "Close",
+    step_decode: "Decoding audio…", step_resample: "Resampling…",
+    step_groove: "Calculating groove path…", step_stl: "Building STL geometry…",
+    step_write: "Writing STL file…", step_done: "Done!",
+    dl_stl: "Download STL", dl_json: "Report JSON", dl_cmd: "Copy CLI Command",
+    info_size: "Size", info_rpm: "RPM", info_groove: "Groove", info_sides: "Sides",
+    info_triangles: "Triangles", info_duration: "Duration",
+    layer_h: "Layer Height", nozzle: "Nozzle", material: "Material", infill: "Infill",
+    note: "Note",
+    warn_too_long: "※ Audio exceeds max duration. It will be trimmed.",
+  }
+};
+let currentLang = 'ja';
+function T(k) { return (I18N[currentLang]||I18N.ja)[k] || k; }
+function setLang(l) {
+  currentLang = l;
+  document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('active', b.textContent.trim() === (l==='ja'?'日本語':'EN')));
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const k = el.getAttribute('data-i18n');
+    if (I18N[l][k]) el.textContent = I18N[l][k];
+  });
+  updateInfo();
+  drawVinyl();
+}
+
+// ── State ──────────────────────────────────────────────────────────────────
+let state = { size: 12, rpm: 33, groove: 'mono', sides: 1 };
+let audioBuffer = null;   // Float32Array (left channel samples @ 44100)
+let audioBufferR = null;  // right channel
+let audioSR = 44100;
+let audioDuration = 0;
+let isRecording = false;
+let mediaRecorder = null;
+let recChunks = [];
+let recInterval = null;
+let recSeconds = 0;
+let lastStlBlob = null;
+let lastJsonBlob = null;
+
+// ── Segment selector ────────────────────────────────────────────────────────
+function setSeg(type, val) {
+  state[type] = val;
+  const groupId = { size: 'sizeGroup', rpm: 'rpmGroup', groove: 'grooveGroup' }[type];
+  document.querySelectorAll(`#${groupId} .seg-btn`).forEach(b => {
+    b.classList.toggle('active', b.dataset.val == val);
+  });
+  updateInfo();
+  drawVinyl();
+}
+
+// ── Physical specs ─────────────────────────────────────────────────────────
+const SPECS = {
+  7:  { outer_r:87.0,  groove_outer:82.5, groove_inner:35.0, label_r:33.5,  thickness:1.8, hole_r:3.75 },
+  10: { outer_r:127.0, groove_outer:122.5,groove_inner:38.0, label_r:36.0,  thickness:1.8, hole_r:3.75 },
+  12: { outer_r:152.4, groove_outer:146.0,groove_inner:60.0, label_r:58.0,  thickness:2.0, hole_r:3.75 },
+};
+const RPM_G = {
+  33: { w:0.55, d:0.30, sp:0.30 },
+  45: { w:0.55, d:0.30, sp:0.28 },
+  78: { w:0.65, d:0.35, sp:0.25 },
+};
+function calcMaxDuration(size, rpm) {
+  const spec = SPECS[size], g = RPM_G[rpm];
+  const pitch = g.w + g.sp;
+  const turns = (spec.groove_outer - spec.groove_inner) / pitch;
+  const r_mean = (spec.groove_outer + spec.groove_inner) / 2;
+  const len_mm = 2 * Math.PI * r_mean * turns;
+  const v = 2 * Math.PI * r_mean * rpm / 60;
+  return { dur: len_mm / v, turns, len_mm };
+}
+
+function updateInfo() {
+  state.sides = document.getElementById('sidesToggle').checked ? 2 : 1;
+  const { dur, turns, len_mm } = calcMaxDuration(state.size, state.rpm);
+  const sides = state.sides;
+  document.getElementById('infoMaxDur').textContent   = fmtSec(dur * sides);
+  document.getElementById('infoAudioDur').textContent = audioBuffer ? fmtSec(audioDuration) : '—';
+  document.getElementById('infoTurns').textContent    = (turns * sides).toFixed(1);
+  document.getElementById('infoGrooveLen').textContent= ((len_mm * sides)/1000).toFixed(1) + ' m';
+  document.getElementById('infoPrinter').textContent  = state.rpm === 78 ? 'SLA / DLP ★★★' : 'SLA / DLP';
+  document.getElementById('genBtn').disabled          = !audioBuffer;
+}
+function fmtSec(s) {
+  const m = Math.floor(s/60), sec = Math.floor(s%60);
+  return `${m}:${sec.toString().padStart(2,'0')}`;
+}
+
+// ── Vinyl canvas ───────────────────────────────────────────────────────────
+function drawVinyl() {
+  const cv = document.getElementById('vinylCanvas');
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height, cx = W/2, cy = H/2;
+  const spec = SPECS[state.size];
+  const g    = RPM_G[state.rpm];
+  const scale = (W/2 - 8) / spec.outer_r;
+
+  ctx.clearRect(0,0,W,H);
+
+  // Background disc
+  const grad = ctx.createRadialGradient(cx,cy,0,cx,cy,cx);
+  grad.addColorStop(0,   '#22222e');
+  grad.addColorStop(0.4, '#1a1a24');
+  grad.addColorStop(1,   '#0d0d12');
+  ctx.beginPath(); ctx.arc(cx,cy,spec.outer_r*scale,0,Math.PI*2);
+  ctx.fillStyle = grad; ctx.fill();
+
+  // Groove spiral
+  const pitch = (g.w + g.sp) * scale;
+  const r_out = spec.groove_outer * scale;
+  const r_in  = spec.groove_inner * scale;
+  const turns = (spec.groove_outer - spec.groove_inner) / (g.w + g.sp);
+
+  ctx.strokeStyle = '#2a2a3a';
+  ctx.lineWidth   = Math.max(0.5, pitch * 0.6);
+  ctx.beginPath();
+  let r = r_out;
+  const steps = Math.ceil(turns * 60);
+  for (let i = 0; i <= steps; i++) {
+    const angle = -i * (2*Math.PI/60);
+    r = r_out - (i/steps)*(r_out - r_in);
+    const x = cx + r * Math.cos(angle);
+    const y = cy + r * Math.sin(angle);
+    i === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+
+  // Audio-modulated groove (if loaded)
+  if (audioBuffer && audioBuffer.length > 0) {
+    const samples = audioBuffer;
+    const sr = audioSR;
+    const maxSamples = Math.min(samples.length, calcMaxDuration(state.size,state.rpm).dur * sr);
+    ctx.strokeStyle = '#e8c840';
+    ctx.lineWidth   = Math.max(0.3, pitch * 0.25);
+    ctx.beginPath();
+    for (let i = 0; i <= steps; i++) {
+      const frac  = i / steps;
+      const angle = -frac * turns * 2 * Math.PI;
+      const ri    = r_out - frac*(r_out - r_in);
+      const si    = Math.floor(frac * maxSamples);
+      const amp   = si < samples.length ? samples[si] : 0;
+      const rmod  = ri + amp * pitch * 0.35;
+      const x = cx + rmod * Math.cos(angle);
+      const y = cy + rmod * Math.sin(angle);
+      i === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+  }
+
+  // Label area
+  const gLabel = ctx.createRadialGradient(cx,cy,0,cx,cy,spec.label_r*scale);
+  gLabel.addColorStop(0,'#2c2c3c'); gLabel.addColorStop(1,'#1e1e2c');
+  ctx.beginPath(); ctx.arc(cx,cy,spec.label_r*scale,0,Math.PI*2);
+  ctx.fillStyle = gLabel; ctx.fill();
+
+  // Label ring accent
+  ctx.beginPath(); ctx.arc(cx,cy,spec.label_r*scale,0,Math.PI*2);
+  ctx.strokeStyle = '#e8c84030'; ctx.lineWidth = 1; ctx.stroke();
+
+  // Center hole
+  ctx.beginPath(); ctx.arc(cx,cy,spec.hole_r*scale,0,Math.PI*2);
+  ctx.fillStyle = '#0a0a0c'; ctx.fill();
+
+  // RPM / Size text on label
+  ctx.fillStyle = '#e8c84080';
+  ctx.font = `bold ${12*scale*0.6}px 'Bebas Neue', sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText(`${state.rpm} RPM · ${state.size}"`, cx, cy - 6*scale*0.6);
+  ctx.fillStyle = '#55556890';
+  ctx.font = `${9*scale*0.6}px 'DM Mono', monospace`;
+  ctx.fillText(state.groove.toUpperCase(), cx, cy + 8*scale*0.6);
+}
+
+// ── Waveform ───────────────────────────────────────────────────────────────
+function drawWaveform(samples) {
+  const cv  = document.getElementById('waveCanvas');
+  const ctx = cv.getContext('2d');
+  cv.width  = cv.offsetWidth * devicePixelRatio || 800;
+  cv.height = 70 * devicePixelRatio;
+  ctx.clearRect(0,0,cv.width,cv.height);
+  if (!samples || samples.length === 0) return;
+
+  const W = cv.width, H = cv.height, mid = H/2;
+  const step = Math.max(1, Math.floor(samples.length / W));
+
+  // Max-duration indicator
+  const { dur } = calcMaxDuration(state.size, state.rpm);
+  const maxFrac = Math.min(1, dur / (samples.length / audioSR));
+  ctx.fillStyle = 'rgba(232,200,64,0.04)';
+  ctx.fillRect(0, 0, W * maxFrac, H);
+  ctx.strokeStyle = 'rgba(232,200,64,0.3)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(W * maxFrac, 0); ctx.lineTo(W * maxFrac, H);
+  ctx.stroke();
+
+  // Waveform
+  const grad = ctx.createLinearGradient(0,0,W,0);
+  grad.addColorStop(0,   '#e8c840');
+  grad.addColorStop(maxFrac, '#e8c840');
+  grad.addColorStop(maxFrac, '#444455');
+  grad.addColorStop(1,   '#444455');
+  ctx.strokeStyle = grad;
+  ctx.lineWidth   = 1;
+  ctx.beginPath();
+  for (let x = 0; x < W; x++) {
+    const si = x * step;
+    if (si >= samples.length) break;
+    const v = samples[si];
+    const y = mid - v * mid * 0.85;
+    x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+}
+
+// ── File input ─────────────────────────────────────────────────────────────
+document.getElementById('fileInput').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (file) loadFile(file);
+});
+const dz = document.getElementById('dropZone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) loadFile(file);
+});
+
+async function loadFile(file) {
+  document.getElementById('fileName').textContent = file.name;
+  const ctx = new AudioContext();
+  const ab  = await file.arrayBuffer();
+  const decoded = await ctx.decodeAudioData(ab);
+  audioSR = decoded.sampleRate;
+  audioBuffer  = Array.from(decoded.getChannelData(0));
+  audioBufferR = decoded.numberOfChannels > 1 ? Array.from(decoded.getChannelData(1)) : audioBuffer;
+  audioDuration = decoded.duration;
+  drawWaveform(audioBuffer);
+  drawVinyl();
+  updateInfo();
+}
+
+// ── Mic recording ──────────────────────────────────────────────────────────
+async function toggleMic() {
+  if (!isRecording) {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(stream);
+    recChunks = [];
+    mediaRecorder.ondataavailable = e => recChunks.push(e.data);
+    mediaRecorder.onstop = async () => {
+      const blob = new Blob(recChunks, { type: 'audio/webm' });
+      const file = new File([blob], 'mic_recording.webm', { type: 'audio/webm' });
+      document.getElementById('fileName').textContent = T('mic_start') + ' (' + fmtSec(recSeconds) + ')';
+      await loadFile(file);
+    };
+    mediaRecorder.start();
+    isRecording = true;
+    recSeconds  = 0;
+    document.getElementById('micBtn').classList.add('recording');
+    document.getElementById('micLabel').textContent = T('mic_stop');
+    document.getElementById('recTimer').style.display = 'block';
+    recInterval = setInterval(() => {
+      recSeconds++;
+      document.getElementById('recTimer').textContent = fmtSec(recSeconds);
+    }, 1000);
+  } else {
+    mediaRecorder.stop();
+    mediaRecorder.stream.getTracks().forEach(t => t.stop());
+    isRecording = false;
+    clearInterval(recInterval);
+    document.getElementById('micBtn').classList.remove('recording');
+    document.getElementById('micLabel').textContent = T('mic_start');
+    document.getElementById('recTimer').style.display = 'none';
+  }
+}
+
+// ── STL Generation (client-side) ───────────────────────────────────────────
+function setProgress(pct, msg) {
+  document.getElementById('progressBar').style.width = pct + '%';
+  document.getElementById('progressMsg').textContent = msg;
+}
+
+async function generate() {
+  if (!audioBuffer) return;
+  document.getElementById('progressOverlay').classList.add('show');
+  document.getElementById('progressBar').style.width = '0%';
+
+  await sleep(30);
+  setProgress(10, T('step_decode'));
+  await sleep(50);
+
+  const { dur, turns, len_mm } = calcMaxDuration(state.size, state.rpm);
+  const sides = document.getElementById('sidesToggle').checked ? 2 : 1;
+
+  // Resample to 11025 Hz for groove
+  const TARGET_SR = 11025;
+  setProgress(20, T('step_resample'));
+  await sleep(20);
+  let sampL = resampleLinear(audioBuffer,  audioSR, TARGET_SR);
+  let sampR = resampleLinear(audioBufferR, audioSR, TARGET_SR);
+  const maxSamp = Math.floor(dur * TARGET_SR);
+  if (sampL.length > maxSamp) { sampL = sampL.slice(0, maxSamp); sampR = sampR.slice(0, maxSamp); }
+
+  setProgress(35, T('step_groove'));
+  await sleep(20);
+
+  const allTris = [];
+  const sideLabels = sides === 2 ? ['A','B'] : ['A'];
+  for (let si = 0; si < sideLabels.length; si++) {
+    const sideL = si === 1 ? [...sampL].reverse() : sampL;
+    const sideR = si === 1 ? [...sampR].reverse() : sampR;
+    const gPath = buildGroovePath(sideL, sideR, state.size, state.rpm, state.groove, TARGET_SR, turns);
+    setProgress(50 + si*20, T('step_stl'));
+    await sleep(30);
+    const tris = buildSTL(gPath, state.size, state.rpm);
+    allTris.push({ side: sideLabels[si], tris, gPath });
+    await sleep(30);
+  }
+
+  setProgress(85, T('step_write'));
+  await sleep(30);
+
+  // Combine all STL triangles (both sides offset in Z)
+  let combinedTris = [];
+  const spec = SPECS[state.size];
+  for (let i = 0; i < allTris.length; i++) {
+    const zOffset = i * (spec.thickness + 2);
+    combinedTris = combinedTris.concat(allTris[i].tris.map(([n,v0,v1,v2]) => [
+      n,
+      [v0[0], v0[1], v0[2]+zOffset],
+      [v1[0], v1[1], v1[2]+zOffset],
+      [v2[0], v2[1], v2[2]+zOffset],
+    ]));
+  }
+
+  const stlBlob = buildSTLBlob(combinedTris);
+  lastStlBlob = stlBlob;
+
+  // JSON report
+  const report = buildReport(state.size, state.rpm, state.groove, sides, dur, turns, len_mm);
+  lastJsonBlob = new Blob([JSON.stringify(report,null,2)], { type: 'application/json' });
+
+  setProgress(100, T('step_done'));
+  await sleep(400);
+  document.getElementById('progressOverlay').classList.remove('show');
+  showOutput(report, combinedTris.length);
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ── Resample ───────────────────────────────────────────────────────────────
+function resampleLinear(samples, fromSR, toSR) {
+  if (fromSR === toSR) return samples;
+  const ratio = fromSR / toSR;
+  const len   = Math.floor(samples.length / ratio);
+  const out   = new Float32Array(len);
+  for (let i = 0; i < len; i++) {
+    const src = i * ratio;
+    const i0  = Math.floor(src);
+    const i1  = Math.min(i0+1, samples.length-1);
+    const f   = src - i0;
+    out[i]    = samples[i0]*(1-f) + samples[i1]*f;
+  }
+  return out;
+}
+
+// ── Groove path builder ────────────────────────────────────────────────────
+function buildGroovePath(sampL, sampR, size, rpm, mode, sr, turns) {
+  const spec  = SPECS[size], g = RPM_G[rpm];
+  const r_out = spec.groove_outer, r_in = spec.groove_inner;
+  const pitch = g.w + g.sp, depth = g.d;
+  const sampPerRev = sr * 60 / rpm;
+  const ptsPerRev  = 180;  // balance STL size vs fidelity
+  const totalRevs  = Math.min(turns, sampL.length / sampPerRev);
+  const totalPts   = Math.ceil(totalRevs * ptsPerRev);
+  const path = [];
+  for (let i = 0; i < totalPts; i++) {
+    const frac  = i / totalPts;
+    const angle = frac * totalRevs * 2 * Math.PI;
+    let   r     = r_out - frac * totalRevs * pitch;
+    const si    = Math.min(Math.floor(frac * totalRevs * sampPerRev), sampL.length-1);
+    const sl    = sampL[si] || 0;
+    const sr_   = sampR[si] || 0;
+    let   zm    = 0;
+    if (mode === 'mono') {
+      zm = (sl + sr_) / 2 * depth * 0.5;
+    } else {
+      zm = sl * depth * 0.4;
+      r += sr_ * g.w * 0.15;
+    }
+    path.push([r * Math.cos(-angle), r * Math.sin(-angle), zm]);
+  }
+  return path;
+}
+
+// ── STL builder ────────────────────────────────────────────────────────────
+function cross(a,b) { return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]]; }
+function sub(a,b)   { return [a[0]-b[0], a[1]-b[1], a[2]-b[2]]; }
+function norm(v)    { const l=Math.hypot(...v); return l<1e-9?[0,0,1]:[v[0]/l,v[1]/l,v[2]/l]; }
+function tri(v0,v1,v2){ return [norm(cross(sub(v1,v0),sub(v2,v0))), v0, v1, v2]; }
+
+function buildSTL(path, size, rpm) {
+  const spec = SPECS[size], g = RPM_G[rpm];
+  const T = spec.thickness, w = g.w/2, depth = g.d, hole_r = spec.hole_r;
+  const outer_r = spec.outer_r, N = 180;
+  const tris = [];
+
+  // disc rings (top/bottom) — simplified as flat ring polygon
+  function discRing(ro, ri, z, flip) {
+    for (let i=0; i<N; i++) {
+      const a0 = 2*Math.PI*i/N, a1 = 2*Math.PI*(i+1)/N;
+      const o0=[ro*Math.cos(a0),ro*Math.sin(a0),z], o1=[ro*Math.cos(a1),ro*Math.sin(a1),z];
+      const i0=[ri*Math.cos(a0),ri*Math.sin(a0),z], i1=[ri*Math.cos(a1),ri*Math.sin(a1),z];
+      if (flip) { tris.push(tri(o0,o1,i0)); tris.push(tri(i0,o1,i1)); }
+      else       { tris.push(tri(o0,i0,o1)); tris.push(tri(i0,i1,o1)); }
+    }
+  }
+  discRing(outer_r, hole_r, 0,   true);
+  discRing(outer_r, hole_r, T,   false);
+
+  // outer wall
+  for (let i=0;i<N;i++){
+    const a0=2*Math.PI*i/N, a1=2*Math.PI*(i+1)/N;
+    const b0=[outer_r*Math.cos(a0),outer_r*Math.sin(a0),0];
+    const b1=[outer_r*Math.cos(a1),outer_r*Math.sin(a1),0];
+    const t0=[outer_r*Math.cos(a0),outer_r*Math.sin(a0),T];
+    const t1=[outer_r*Math.cos(a1),outer_r*Math.sin(a1),T];
+    tris.push(tri(b0,b1,t0)); tris.push(tri(b1,t1,t0));
+  }
+  // inner hole wall
+  for (let i=0;i<N;i++){
+    const a0=2*Math.PI*i/N, a1=2*Math.PI*(i+1)/N;
+    const b0=[hole_r*Math.cos(a0),hole_r*Math.sin(a0),0];
+    const b1=[hole_r*Math.cos(a1),hole_r*Math.sin(a1),0];
+    const t0=[hole_r*Math.cos(a0),hole_r*Math.sin(a0),T];
+    const t1=[hole_r*Math.cos(a1),hole_r*Math.sin(a1),T];
+    tris.push(tri(b0,t0,b1)); tris.push(tri(b1,t0,t1));
+  }
+
+  // groove V-shape
+  for (let i=0; i<path.length-1; i++) {
+    const [x0,y0,zm0]=path[i], [x1,y1,zm1]=path[i+1];
+    const dx=x1-x0, dy=y1-y0, dl=Math.hypot(dx,dy);
+    if (dl<1e-9) continue;
+    const nx=-dy/dl, ny=dx/dl;
+    const gz0=Math.max(0.1, Math.min(T-depth+zm0*0.5, T-0.05));
+    const gz1=Math.max(0.1, Math.min(T-depth+zm1*0.5, T-0.05));
+    const lx0=x0-nx*w, ly0=y0-ny*w;
+    const lx1=x1-nx*w, ly1=y1-ny*w;
+    const rx0=x0+nx*w, ry0=y0+ny*w;
+    const rx1=x1+nx*w, ry1=y1+ny*w;
+    const fl0=[x0,y0,gz0], fl1=[x1,y1,gz1];
+    const vl0=[lx0,ly0,T], vl1=[lx1,ly1,T];
+    const vr0=[rx0,ry0,T], vr1=[rx1,ry1,T];
+    tris.push(tri(vl0,fl0,vl1)); tris.push(tri(fl0,fl1,vl1));
+    tris.push(tri(fl0,vr0,fl1)); tris.push(tri(vr0,vr1,fl1));
+  }
+  return tris;
+}
+
+// ── Binary STL blob ────────────────────────────────────────────────────────
+function buildSTLBlob(tris) {
+  const buf = new ArrayBuffer(80 + 4 + tris.length * 50);
+  const view = new DataView(buf);
+  let off = 84;
+  // header already zero
+  view.setUint32(80, tris.length, true);
+  for (const [n,v0,v1,v2] of tris) {
+    for (const c of [...n,...v0,...v1,...v2]) { view.setFloat32(off, c, true); off+=4; }
+    view.setUint16(off, 0, true); off+=2;
+  }
+  return new Blob([buf], { type: 'application/octet-stream' });
+}
+
+// ── Report builder ─────────────────────────────────────────────────────────
+function buildReport(size, rpm, groove, sides, maxDur, turns, lenMm) {
+  const spec = SPECS[size], g = RPM_G[rpm];
+  return {
+    generated_at: new Date().toISOString(),
+    record: { size_inch: size, diameter_mm: spec.outer_r*2, thickness_mm: spec.thickness, rpm, groove_mode: groove, sides },
+    groove: { width_mm: g.w, depth_mm: g.d, spacing_mm: g.sp, turns: +turns.toFixed(2), total_length_m: +(lenMm*sides/1000).toFixed(3) },
+    audio:  { max_duration_s: +(maxDur*sides).toFixed(2), actual_duration_s: +audioDuration.toFixed(2) },
+    print_settings: {
+      recommended_printer: 'SLA/DLP',
+      layer_height_mm: 0.05,
+      nozzle_mm: g.w,
+      infill_percent: 100,
+      material: 'PLA/PETG or Resin',
+    }
+  };
+}
+
+// ── Output panel ────────────────────────────────────────────────────────────
+function showOutput(report, triCount) {
+  const { record: rc, groove: gr, audio: au, print_settings: ps } = report;
+  const grid = document.getElementById('outputGrid');
+  grid.innerHTML = '';
+  const items = [
+    [T('info_size'),      `${rc.size_inch}" (${rc.diameter_mm}mm)`],
+    [T('info_rpm'),       `${rc.rpm} RPM`],
+    [T('info_groove'),    rc.groove_mode.toUpperCase()],
+    [T('info_sides'),     rc.sides],
+    [T('info_duration'),  fmtSec(au.max_duration_s) + (au.actual_duration_s > au.max_duration_s ? ' ⚠' : '')],
+    [T('info_triangles'), triCount.toLocaleString()],
+    [T('layer_h'),        `${ps.layer_height_mm} mm`],
+    [T('nozzle'),         `≤ ${ps.nozzle_mm} mm`],
+    [T('material'),       ps.material],
+    [T('infill'),         '100%'],
+    ['Groove turns',      gr.turns],
+    ['Groove length',     gr.total_length_m + ' m'],
+  ];
+  for (const [k,v] of items) {
+    grid.innerHTML += `<div class="output-card"><div class="key">${k}</div><div class="val">${v}</div></div>`;
+  }
+
+  // Download buttons
+  const dlDiv = document.getElementById('downloadBtns');
+  dlDiv.innerHTML = '';
+  const bSTL = document.createElement('button');
+  bSTL.className = 'dl-btn stl'; bSTL.textContent = T('dl_stl');
+  bSTL.onclick = () => downloadBlob(lastStlBlob, `record_${rc.size_inch}in_${rc.rpm}rpm.stl`);
+  const bJSON = document.createElement('button');
+  bJSON.className = 'dl-btn json'; bJSON.textContent = T('dl_json');
+  bJSON.onclick = () => downloadBlob(lastJsonBlob, 'record_report.json');
+  dlDiv.appendChild(bSTL); dlDiv.appendChild(bJSON);
+
+  // CLI command
+  const cmd = `python record_generator.py \\\n  --audio YOUR_FILE.wav \\\n  --size ${rc.size_inch} \\\n  --rpm ${rc.rpm} \\\n  --groove ${rc.groove_mode} \\\n  --sides ${rc.sides} \\\n  --lang ${currentLang}`;
+  document.getElementById('cmdBlock').textContent = cmd;
+
+  document.getElementById('outputPanel').classList.add('show');
+}
+
+function closeOutput() { document.getElementById('outputPanel').classList.remove('show'); }
+
+document.getElementById('outputPanel').addEventListener('click', (event) => {
+  if (event.target === event.currentTarget) {
+    closeOutput();
+  }
+});
+
+function downloadBlob(blob, name) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+}
+
+// ── Copy CLI command ───────────────────────────────────────────────────────
+document.getElementById('cmdBlock') && document.getElementById('cmdBlock').addEventListener('click', () => {
+  navigator.clipboard.writeText(document.getElementById('cmdBlock').textContent).catch(()=>{});
+});
+
+// ── Init ───────────────────────────────────────────────────────────────────
+updateInfo();
+drawVinyl();
+
+// Resize waveform canvas when window resizes
+window.addEventListener('resize', () => {
+  if (audioBuffer) drawWaveform(audioBuffer);
+});
+</script>
+</body>
+</html>
