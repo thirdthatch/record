@@ -3,3 +3,6 @@
 *.wav
 record_project/outputs/
 record_project/uploads/
+.DS_Store
+record_project/Rust/target/
+record_project/__pycache__/
