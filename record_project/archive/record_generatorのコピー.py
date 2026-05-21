@@ -486,9 +486,6 @@ def run(
         if output_format in ("3mf", "both"):
             for stl_file in stl_files:
                 stl_path = Path(stl_file)
-                # Rust returns absolute path; also try sibling of report as fallback
-                if not stl_path.is_file():
-                    stl_path = report_path.parent / stl_path.name
                 if stl_path.is_file():
                     threemf_path = stl_path.with_suffix(".3mf")
                     triangles = load_stl_mesh(stl_path)

@@ -68,14 +68,8 @@ def _field_text(form: cgi.FieldStorage, name: str, default: str) -> str:
         return default
     value = item.value
     if isinstance(value, bytes):
-        value = value.decode("utf-8", "replace")
-    else:
-        value = str(value)
-    # JavaScript sometimes sends the string "undefined" or "null" when a
-    # variable is unset.  Treat these the same as missing → return default.
-    if value in ("undefined", "null", ""):
-        return default
-    return value
+        return value.decode("utf-8", "replace")
+    return str(value)
 
 
 def _prepare_audio_for_python(upload_path: Path) -> tuple[Path, str]:
@@ -326,33 +320,39 @@ class GUIHandler(SimpleHTTPRequestHandler):
 
         report = json.loads(report_path.read_text(encoding="utf-8"))
         files = []
-
-        def _resolve(path_text: str):
-            """Return the first existing Path for a report file entry, or None."""
-            candidates = [
-                Path(path_text),                      # absolute path from Rust
-                OUTPUT_DIR / Path(path_text).name,    # just the filename in outputs/
-            ]
+        # Normalize paths returned by the report. Rust may emit absolute paths
+        # or relative paths; prefer resolving to actual files under OUTPUT_DIR.
+        def _resolve_report_path(path_text: str) -> Path | None:
+            raw = Path(path_text)
+            candidates = [raw]
+            try:
+                candidates.append((OUTPUT_DIR / raw))
+            except Exception:
+                pass
+            try:
+                candidates.append((OUTPUT_DIR / raw.name))
+            except Exception:
+                pass
             for c in candidates:
-                if c.is_file():
+                if c.exists() and c.is_file():
                     return c
             return None
 
         for path_text in report.get("stl_output", {}).get("files", []):
-            p = _resolve(path_text)
-            if p:
+            path = _resolve_report_path(path_text)
+            if path:
                 files.append({
-                    "name": p.name,
-                    "url": f"/outputs/{p.name}",
-                    "bytes": p.stat().st_size,
+                    "name": path.name,
+                    "url": f"/outputs/{path.name}",
+                    "bytes": path.stat().st_size,
                 })
         for path_text in report.get("3mf_output", {}).get("files", []):
-            p = _resolve(path_text)
-            if p:
+            path = _resolve_report_path(path_text)
+            if path:
                 files.append({
-                    "name": p.name,
-                    "url": f"/outputs/{p.name}",
-                    "bytes": p.stat().st_size,
+                    "name": path.name,
+                    "url": f"/outputs/{path.name}",
+                    "bytes": path.stat().st_size,
                 })
         files.append({
             "name": report_path.name,

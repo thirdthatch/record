@@ -216,8 +216,11 @@ fn load_separate_sides(
     let b_chunk = if b_paths.is_empty() {
         (Vec::new(), Vec::new(), 0.0)
     } else {
-        let placeholder = primary_path;
-        load_audio_sequence(placeholder, b_paths, silence_b, apply_riaa, max_duration_s)?
+        // Use the first path in b_paths as the base, remaining entries as additional
+        match b_paths.split_first() {
+            Some((base, rest)) => load_audio_sequence(base.as_str(), rest, silence_b, apply_riaa, max_duration_s)?,
+            None => (Vec::new(), Vec::new(), 0.0),
+        }
     };
 
     Ok((a_chunk, b_chunk))
