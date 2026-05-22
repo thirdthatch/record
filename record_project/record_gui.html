@@ -1166,24 +1166,6 @@ async function uploadStlFile(file) {
   }
 }
 
-async function fetchStlAndVerify(fileUrl, fileName) {
-  try {
-    const resolvedUrl = fileUrl.startsWith('http') ? fileUrl : new URL(fileUrl, API_BASE_URL).href;
-    const res = await fetch(resolvedUrl);
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Failed to download ${fileName}: ${body || res.statusText}`);
-    }
-    const blob = await res.blob();
-    const stlFile = new File([blob], fileName, { type: 'application/sla' });
-    return uploadStlFile(stlFile);
-  } catch (error) {
-    els.stlUploadStatus.textContent = '生成STLの自動検証に失敗しました。';
-    els.formError.textContent = error.message;
-    console.warn('Auto verify STL failed', error);
-  }
-}
-
 async function openDownloadsPanel() {
   document.getElementById('outputPanel').classList.add('show');
 }
@@ -1729,14 +1711,6 @@ function showOutput(result) {
 
   document.getElementById('Log').textContent = result.log || '';
   document.getElementById('outputPanel').classList.add('show');
-
-  const stlFile = files.find((file) => file.name.toLowerCase().endsWith('.stl'));
-  if (stlFile) {
-    els.stlUploadStatus.textContent = `生成されたSTLを検証中: ${stlFile.name}`;
-    fetchStlAndVerify(stlFile.url, stlFile.name).catch((error) => {
-      console.warn('Auto verify generated STL failed', error);
-    });
-  }
 }
 
 function escapeHtml(value) {
